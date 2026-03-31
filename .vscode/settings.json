@@ -1,0 +1,9 @@
+{
+    "css.validate": true,
+    "css.customData": [
+        ".vscode/tailwind.custom.json"
+    ],
+    "tailwindCSS.includeLanguages": {
+        "plaintext": "html"
+    }
+}

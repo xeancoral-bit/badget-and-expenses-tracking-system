@@ -1,0 +1,33 @@
+{
+    "version": 1.1,
+    "atDirectives": [
+        {
+            "atRule": "@tailwind",
+            "description": "Tailwind CSS main directives"
+        },
+        {
+            "atRule": "@layer",
+            "description": "Tailwind CSS layer directives"
+        },
+        {
+            "atRule": "@apply",
+            "description": "Tailwind CSS apply directive"
+        }
+    ],
+    "utilities": [
+        {
+            "name": "ring",
+            "description": "Tailwind CSS ring utility",
+            "references": [
+                "https://tailwindcss.com/docs/ring-width"
+            ]
+        },
+        {
+            "name": "ring-offset",
+            "description": "Tailwind CSS ring-offset utility",
+            "references": [
+                "https://tailwindcss.com/docs/ring-offset-width"
+            ]
+        }
+    ]
+}
