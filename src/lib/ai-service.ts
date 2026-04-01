@@ -75,7 +75,7 @@ RULES:
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: "openai/gpt-oss-120b",
+                model: "llama3-70b-8192",
                 messages: [
                     { role: "system", content: systemPrompt },
                     ...history.map((m: any) => ({
@@ -86,8 +86,7 @@ RULES:
                 ],
                 temperature: 1,
                 max_completion_tokens: 8192,
-                top_p: 1,
-                reasoning_effort: "medium"
+                top_p: 1
             })
         });
 

@@ -39,7 +39,7 @@ def run_chat(user_message):
     context = get_financial_context()
     
     completion = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model="llama3-70b-8192",
         messages=[
             {
                 "role": "system",
@@ -53,7 +53,6 @@ def run_chat(user_message):
         temperature=1,
         max_completion_tokens=8192,
         top_p=1,
-        reasoning_effort="medium",
         stream=True,
         stop=None
     )
