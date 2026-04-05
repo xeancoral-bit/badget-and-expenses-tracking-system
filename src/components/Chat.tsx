@@ -10,7 +10,7 @@ export default function Chat() {
     const isDark = theme === 'dark';
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [showWelcome, setShowWelcome] = useState(true);
+    const [showWelcome, setShowWelcome] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
