@@ -58,7 +58,16 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Ensure Row Level Security is disabled for all tables to allow the AI Strategist 
+-- Financial Insights Table
+CREATE TABLE IF NOT EXISTS financial_insights (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    impact TEXT CHECK(impact IN ('positive', 'negative', 'neutral')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 -- to manage your personal finance data without manual policy configuration.
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
