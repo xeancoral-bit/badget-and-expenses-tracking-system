@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getUser, updateTransaction, deleteTransaction } from '@/lib/db';
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {

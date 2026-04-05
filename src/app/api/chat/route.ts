@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getUser, getChatHistory } from '@/lib/db';
 import { processChatMessage } from '@/lib/ai-service';
 

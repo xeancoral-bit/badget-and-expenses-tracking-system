@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { getUser } from '@/lib/db';
 import { generateInsights } from '@/lib/ai-service';
 
