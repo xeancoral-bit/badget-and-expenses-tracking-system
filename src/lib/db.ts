@@ -5,16 +5,12 @@ import { supabase } from './supabase';
 // ─────────────────────────────────────────────────────────────
 
 export async function getUser() {
-    // 1. Diagnostics for Deployment Access
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // 1. Diagnostics for Deployment Access (Now with hardcoded fallbacks in supabase.ts)
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://geruywlgwotwuxxystsa.supabase.co';
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlcnV5d2xnd290d3V4eHlzdHNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMjY1NjEsImV4cCI6MjA4ODkwMjU2MX0.hZw_CIriyevIF8lukIQGnInfhXIrKECIBSuYbNMUHdA';
 
     if (!url || !key) {
-        let missing = [];
-        if (!url) missing.push('NEXT_PUBLIC_SUPABASE_URL');
-        if (!key) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-        throw new Error(`Supabase configuration is missing: [${missing.join(', ')}]. Please add these to your Vercel Environment Variables.`);
+        throw new Error(`Missing fundamental connectivity credentials. Please verify your Supabase keys.`);
     }
 
     // Try to get existing user

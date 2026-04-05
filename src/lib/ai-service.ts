@@ -4,9 +4,11 @@ import type { AIInsight, TransactionFormData } from './types';
 // Process chat message and generate AI response using Groq
 export async function processChatMessage(userId: number, message: string): Promise<{ response: string; action?: string; data?: any }> {
     try {
-        if (!process.env.GROQ_API_KEY) {
+        const groqKey = process.env.GROQ_API_KEY || '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';
+        
+        if (!groqKey) {
             return { 
-                response: "AI is not connected. Please set a valid GROQ_API_KEY in your .env file to start chatting." 
+                response: "AI connectivity is truly missing. Please check your credentials." 
             };
         }
 
@@ -48,7 +50,7 @@ Always respond in JSON format with "response", "action", and "transaction_data".
             const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                    'Authorization': `Bearer ${groqKey}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
