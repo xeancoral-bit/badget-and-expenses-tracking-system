@@ -53,11 +53,22 @@ export default function Chat() {
             const data = await response.json();
 
             if (data.error) {
-                dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: `Error: ${data.error}` } });
-                addNotification(`Error: ${data.error}`, 'error');
+                // Determine if it's a configuration error
+                let errorContent = `⚠️ ${data.error}`;
+                if (data.message) {
+                    errorContent += `\n\nDetails: ${data.message}`;
+                }
+                
+                if (data.error.includes('Groq API Error') || data.message?.includes('GROQ_API_KEY')) {
+                    errorContent = "⚠️ **AI Connection Issue**\nThe AI engine is not configured or the API key is invalid. Please check your environment variables in Vercel.";
+                }
+
+                dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: errorContent } });
+                addNotification('AI processing failed', 'error');
             } else {
-                dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: data.response || "I processed your request, but I couldn't generate a specific response." } });
-                addNotification('AI responded to your message', 'success');
+                const aiResponse = data.response || "I processed your request, but I couldn't generate a specific response.";
+                dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: aiResponse } });
+                addNotification('AI strategy updated', 'success');
             }
 
             // Refresh data if a transaction was added
@@ -177,26 +188,31 @@ export default function Chat() {
                                     {msg.role === 'user' ? <User size={14} className="text-white" /> : <Sparkles size={14} className={isDark ? 'text-charcoal-accent' : 'text-slate-600'} />}
                                 </div>
                                 <div
-                                    className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${msg.role === 'user'
-                                        ? `${isDark ? 'bg-charcoal-accent' : 'bg-black'} text-white rounded-tr-sm`
-                                        : `${isDark ? 'bg-charcoal-tertiary border border-charcoal-border' : 'bg-slate-100 border border-slate-200'} ${isDark ? 'text-charcoal-text-primary' : 'text-slate-800'} rounded-tl-sm`
+                                    className={`max-w-[85%] rounded-2xl p-4 shadow-sm transition-all duration-300 transform scale-100 origin-top
+                                        ${msg.role === 'user'
+                                            ? `${isDark ? 'bg-charcoal-accent shadow-lg shadow-charcoal-accent/10' : 'bg-black shadow-lg shadow-black/10'} text-white rounded-tr-sm`
+                                            : msg.content.startsWith('⚠️') 
+                                                ? `${isDark ? 'bg-red-950/40 border border-red-500/50 text-red-200' : 'bg-red-50 border border-red-100 text-red-700'} rounded-tl-sm`
+                                                : `${isDark ? 'bg-charcoal-tertiary border border-charcoal-border shadow-inner' : 'bg-white border border-slate-200 shadow-sm'} ${isDark ? 'text-charcoal-text-primary' : 'text-slate-800'} rounded-tl-sm`
                                         }`}
                                 >
-                                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                    <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'font-medium' : 'font-normal'}`}>
+                                        {msg.content}
+                                    </p>
                                 </div>
                             </div>
                         ))}
 
                         {isLoading && (
-                            <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-charcoal-tertiary border border-charcoal-border flex items-center justify-center">
-                                    <Loader2 className="text-charcoal-accent animate-spin" size={14} />
+                            <div className="flex items-start gap-3 animate-pulse">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-charcoal-tertiary border border-charcoal-border' : 'bg-slate-100 border border-slate-200'}`}>
+                                    <Loader2 className={`${isDark ? 'text-charcoal-accent' : 'text-slate-600'} animate-spin`} size={14} />
                                 </div>
-                                <div className="bg-charcoal-tertiary border border-charcoal-border rounded-2xl p-4 rounded-tl-sm">
-                                    <div className="flex gap-1">
-                                        <div className="w-1.5 h-1.5 bg-charcoal-accent rounded-full animate-bounce" />
-                                        <div className="w-1.5 h-1.5 bg-charcoal-accent rounded-full animate-bounce [animation-delay:0.2s]" />
-                                        <div className="w-1.5 h-1.5 bg-charcoal-accent rounded-full animate-bounce [animation-delay:0.4s]" />
+                                <div className={`max-w-[85%] rounded-2xl p-4 rounded-tl-sm ${isDark ? 'bg-charcoal-tertiary border border-charcoal-border' : 'bg-slate-100 border border-slate-200'} border shadow-sm`}>
+                                    <div className="flex gap-1.5 items-center h-full">
+                                        <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-duration:1s] ${isDark ? 'bg-charcoal-accent' : 'bg-slate-400'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.2s] [animation-duration:1s] ${isDark ? 'bg-charcoal-accent' : 'bg-slate-400'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0.4s] [animation-duration:1s] ${isDark ? 'bg-charcoal-accent' : 'bg-slate-400'}`} />
                                     </div>
                                 </div>
                             </div>
