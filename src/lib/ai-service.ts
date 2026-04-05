@@ -42,90 +42,89 @@ Always respond in JSON format with "response", "action", and "transaction_data".
 
 
         // 3. Call Groq via REST API (OpenAI Compatible)
-        let content = '{}';
+        let aiResult: any = { response: "I'm sorry, I'm having trouble processing that right now.", action: null, data: null };
         
-        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                response_format: { type: "json_object" },
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    ...history.map((m: any) => ({
-                        role: m.role === 'assistant' ? 'assistant' : 'user',
-                        content: m.content
-                    })),
-                    { role: "user", content: message }
-                ],
-                temperature: 1,
-                max_completion_tokens: 8192,
-                top_p: 1
-            })
-        });
-
-        if (!groqResponse.ok) {
-            const error = await groqResponse.json();
-            throw new Error(`Groq API Error: ${JSON.stringify(error)}`);
-        }
-
-        const data = await groqResponse.json();
-        content = data.choices[0]?.message?.content || '{}';
-
-        // Strip markdown blocks if the LLM wrapped it
-        content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        let aiResult;
         try {
-            aiResult = JSON.parse(content);
-        } catch (e) {
-            console.error("AI returned non-JSON:", content);
-            aiResult = { response: content, action: null, transaction_data: null };
+            const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: "llama-3.3-70b-versatile",
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        ...history.map((m: any) => ({
+                            role: m.role === 'assistant' ? 'assistant' : 'user',
+                            content: m.content
+                        })),
+                        { role: "user", content: message }
+                    ],
+                    temperature: 0.7, // Lower temp for more predictable JSON
+                    max_completion_tokens: 4096,
+                    top_p: 1
+                })
+            });
+
+            if (!groqResponse.ok) {
+                const groqError = await groqResponse.json();
+                console.error("Groq API Error Detail:", groqError);
+                throw new Error(`Groq API Error: ${groqError.error?.message || 'Unknown error'}`);
+            }
+
+            const groqData = await groqResponse.json();
+            const rawContent = groqData.choices[0]?.message?.content || '{}';
+            
+            // Safety cleaning of content
+            const cleanedContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+            aiResult = JSON.parse(cleanedContent);
+            
+        } catch (jsonError) {
+            console.error("AI returned non-JSON or Groq failed:", jsonError);
+            // If it's a raw string, we try to use it as response
+            if (typeof aiResult === 'string') {
+                aiResult = { response: aiResult, action: null, transaction_data: null };
+            }
         }
         
-        const { response, action, transaction_data } = aiResult;
+        const response = aiResult.response || "I've processed your request.";
+        const action = aiResult.action || null;
+        const transaction_data = aiResult.transaction_data || null;
 
         // 4. Handle Actions
         let finalAction = action;
         let finalData = null;
 
         if (action === 'transaction_added' && transaction_data) {
-            // Find category ID
-            const allCats = await getCategories(transaction_data.type);
-            const category = allCats.find((c: any) => 
-                c.name.toLowerCase() === transaction_data.category_name.toLowerCase() ||
-                transaction_data.category_name.toLowerCase().includes(c.name.toLowerCase()) ||
-                c.name.toLowerCase().includes(transaction_data.category_name.toLowerCase())
-            );
+            try {
+                // Find category ID
+                const transType = transaction_data.type || 'expense';
+                const allCats = await getCategories(transType);
+                const categoryName = transaction_data.category_name || 'Other';
+                
+                const category = allCats.find((c: any) => 
+                    c.name.toLowerCase() === categoryName.toLowerCase() ||
+                    categoryName.toLowerCase().includes(c.name.toLowerCase()) ||
+                    c.name.toLowerCase().includes(categoryName.toLowerCase())
+                );
 
-            if (category) {
+                const finalCategoryId = category ? category.id : (allCats.find((c: any) => c.name.toLowerCase().includes('other'))?.id || allCats[0]?.id || 10);
+
                 const transactionData: TransactionFormData = {
                     account_id: transaction_data.account_id || accounts[0]?.id || 1,
-                    amount: transaction_data.amount,
-                    type: transaction_data.type,
-                    description: transaction_data.description,
-                    category_id: category.id,
+                    amount: Math.abs(transaction_data.amount || 0),
+                    type: transType,
+                    description: transaction_data.description || 'AI Generated Transaction',
+                    category_id: finalCategoryId,
                     date: new Date().toISOString().split('T')[0]
                 };
 
                 await createTransaction(userId, transactionData);
                 finalData = transactionData;
-            } else {
-                // If category not found, still add to "Other"
-                const otherCat = allCats.find((c: any) => c.name.toLowerCase().includes('other')) || allCats[0];
-                const transactionData: TransactionFormData = {
-                    account_id: transaction_data.account_id || accounts[0]?.id || 1,
-                    amount: transaction_data.amount,
-                    type: transaction_data.type,
-                    description: transaction_data.description,
-                    category_id: otherCat.id,
-                    date: new Date().toISOString().split('T')[0]
-                };
-                await createTransaction(userId, transactionData);
-                finalData = transactionData;
+            } catch (actError) {
+                console.error("Action handler failed:", actError);
             }
         }
 

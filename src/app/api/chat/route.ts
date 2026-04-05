@@ -12,8 +12,13 @@ export async function POST(request: Request) {
         const result = await processChatMessage(user.id, body.message);
 
         return NextResponse.json(result);
-    } catch (error) {
-        return NextResponse.json({ error: 'Failed to process message' }, { status: 500 });
+    } catch (error: any) {
+        console.error('Chat API Error:', error);
+        return NextResponse.json({ 
+            error: 'Failed to process message',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+        }, { status: 500 });
     }
 }
 
