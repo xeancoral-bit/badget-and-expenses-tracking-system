@@ -5,9 +5,16 @@ import { supabase } from './supabase';
 // ─────────────────────────────────────────────────────────────
 
 export async function getUser() {
-    // 1. Proactive Environment Check
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        throw new Error('Supabase configuration is missing (URL or Anon Key). Please check your environment variables.');
+    // 1. Diagnostics for Deployment Access
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+        let missing = [];
+        if (!url) missing.push('NEXT_PUBLIC_SUPABASE_URL');
+        if (!key) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+        throw new Error(`Supabase configuration is missing: [${missing.join(', ')}]. Please add these to your Vercel Environment Variables.`);
     }
 
     // Try to get existing user
@@ -20,11 +27,10 @@ export async function getUser() {
         users = result.data;
         error = result.error;
     } catch (networkError: any) {
-        console.error('Critical Network Failure in local getUser:', networkError);
-        throw new Error(`getUser error: Network or Fetch Failure. This usually means the Supabase URL is incorrect or inaccessible. (${networkError.message})`);
+        throw new Error(`Deployment connection error: ${networkError.message || 'Supabase URL remains inaccessible.'}`);
     }
 
-    if (error) throw new Error(`getUser error: ${error.message}`);
+    if (error) throw new Error(`getUser database error: ${error.message}`);
 
     if (users && users.length > 0) {
         // Make sure they have at least one account
