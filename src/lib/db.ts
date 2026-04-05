@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, getSupabaseAdmin } from './supabase';
 
 // ─────────────────────────────────────────────────────────────
 // USER
@@ -546,7 +546,8 @@ export async function getFinancialSummary(userId: number) {
 // ─────────────────────────────────────────────────────────────
 
 export async function addChatMessage(userId: number, role: string, content: string) {
-    const { data, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
         .from('chat_messages')
         .insert({ user_id: userId, role, content })
         .select()
