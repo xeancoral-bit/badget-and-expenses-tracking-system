@@ -1,4 +1,4 @@
-﻿-- Users Table
+-- Users Table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
@@ -57,6 +57,16 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     content TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Ensure Row Level Security is disabled for all tables to allow the AI Strategist 
+-- to manage your personal finance data without manual policy configuration.
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE budgets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE financial_insights DISABLE ROW LEVEL SECURITY;
 
 -- Seed Initial Categories (Optional, but good for default state)
 INSERT INTO categories (name, type, icon, color) VALUES 
