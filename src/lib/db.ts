@@ -392,7 +392,7 @@ export async function getSpendingByCategory(userId: number) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
-    const { data: transactions, error } = await supabase
+    const { data: monthTransactions, error } = await supabase
         .from('transactions')
         .select('amount, categories ( name, color )')
         .eq('user_id', userId)
@@ -400,12 +400,25 @@ export async function getSpendingByCategory(userId: number) {
         .gte('date', startOfMonth);
 
     if (error) throw new Error(`getSpendingByCategory error: ${error.message}`);
-    if (!transactions || transactions.length === 0) return [];
+
+    let transactionsToUse = monthTransactions || [];
+
+    // All-time fallback if current month is empty
+    if (transactionsToUse.length === 0) {
+        const { data: allTransactions } = await supabase
+            .from('transactions')
+            .select('amount, categories ( name, color )')
+            .eq('user_id', userId)
+            .eq('type', 'expense');
+        transactionsToUse = allTransactions || [];
+    }
+
+    if (transactionsToUse.length === 0) return [];
 
     const categoryTotals: Record<string, { amount: number; color: string }> = {};
     let totalExpenses = 0;
 
-    transactions.forEach((t: any) => {
+    transactionsToUse.forEach((t: any) => {
         const categoryName = t.categories?.name || 'Uncategorized';
         const color = t.categories?.color || '#cbd5e1';
         const amount = Number(t.amount);
@@ -469,7 +482,14 @@ export async function getFinancialSummary(userId: number) {
             .select('balance')
             .eq('user_id', userId);
 
-        const totalBalance = (accounts || []).reduce((sum, acc: any) => sum + Number(acc.balance || 0), 0);
+        const { data: allTransactions } = await supabase
+            .from('transactions')
+            .select('amount, type')
+            .eq('user_id', userId);
+
+        const totalBalance = (allTransactions || []).reduce((sum, t: any) => {
+            return t.type === 'income' ? sum + Number(t.amount) : sum - Number(t.amount);
+        }, 0);
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];

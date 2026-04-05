@@ -61,26 +61,38 @@ export default function Dashboard() {
         })).sort((a, b) => b.amount - a.amount);
     }, [transactions]);
 
-    // Live "Auto-detection" - prioritizing transactions as the Source of Truth for "Connection"
+    // Comprehensive logic to connect transactions to dashboard cards
     const displayBalance = transactions.reduce((sum, t) => {
         return t.type === 'income' ? sum + Number(t.amount) : sum - Number(t.amount);
     }, 0);
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const dateStr = startOfMonth.toISOString().split('T')[0];
 
+    // Current Month Totals
     const currentMonthTransactions = transactions.filter(t => {
-        const tDate = new Date(t.date);
+        const [year, month, day] = t.date.split('-');
+        const tDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
         return tDate >= startOfMonth;
     });
 
-    const displayIncome = currentMonthTransactions
+    const monthlyIncome = currentMonthTransactions
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
         
-    const displayExpenses = currentMonthTransactions
+    const monthlyExpenses = currentMonthTransactions
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    // All-time Totals for fallback (making it more functional if month is empty)
+    const allTimeIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const allTimeExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    
+    // Final values to display with clear fallback
+    const displayIncome = monthlyIncome > 0 ? monthlyIncome : allTimeIncome;
+    const displayExpenses = monthlyExpenses > 0 ? monthlyExpenses : allTimeExpenses;
+    const isShowingAllTime = monthlyIncome === 0 && monthlyExpenses === 0;
 
     const savingsRate = displayIncome > 0
         ? ((displayIncome - displayExpenses) / displayIncome) * 100
@@ -127,7 +139,9 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <p className="text-2xl font-bold text-emerald-600 tracking-tighter">₱{displayIncome.toLocaleString()}</p>
-                    <p className="text-xs text-text-muted mt-2">Monthly earnings</p>
+                    <p className="text-[10px] uppercase font-bold text-text-muted mt-2 tracking-wider">
+                        {isShowingAllTime ? 'Overall Earnings' : 'Current Month Earnings'}
+                    </p>
                 </div>
 
                 <div className="stat-card border-red-500/20">
@@ -138,7 +152,9 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <p className="text-2xl font-bold text-red-600 tracking-tighter">₱{displayExpenses.toLocaleString()}</p>
-                    <p className="text-xs text-text-muted mt-2">Current spending</p>
+                    <p className="text-[10px] uppercase font-bold text-text-muted mt-2 tracking-wider">
+                        {isShowingAllTime ? 'Overall Spending' : 'Current Month Spending'}
+                    </p>
                 </div>
 
                 <div className="stat-card">

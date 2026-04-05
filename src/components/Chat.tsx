@@ -65,8 +65,9 @@ export default function Chat() {
                 refreshData();
                 addNotification('Transaction added successfully!', 'success');
             }
-        } catch (error) {
-            dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' } });
+        } catch (error: any) {
+            console.error(error);
+            dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: `Sorry, I encountered an error: ${error.message || 'Please try again.'}` } });
             addNotification('Chat error occurred', 'error');
         } finally {
             setIsLoading(false);
@@ -118,7 +119,7 @@ export default function Chat() {
                                 <Sparkles className={isDark ? 'text-charcoal-accent' : 'text-white'} size={22} />
                             </div>
                             <div>
-                                <h3 className={`text-sm font-black tracking-wider uppercase ${isDark ? 'text-charcoal-text-primary' : 'text-white'}`}>SmartBudget Gemini AI</h3>
+                                <h3 className={`text-sm font-black tracking-wider uppercase ${isDark ? 'text-charcoal-text-primary' : 'text-white'}`}>SmartBudget AI</h3>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-charcoal-success' : 'bg-emerald-400'}`} />
                                     <span className={`text-[10px] font-bold ${isDark ? 'text-charcoal-success' : 'text-emerald-400'}`}>Online & Learning</span>
@@ -214,7 +215,7 @@ export default function Chat() {
                                 placeholder="Speak naturally..."
                                 className={`w-full border-2 rounded-2xl py-4 pl-5 pr-14 text-sm transition-all shadow-inner focus:outline-none focus:ring-2
                                     ${isDark 
-                                        ? 'bg-charcoal-secondary border-charcoal-accent/30 text-black placeholder:text-slate-400 focus:ring-charcoal-accent/50' 
+                                        ? 'bg-charcoal-secondary border-charcoal-accent/30 text-white placeholder:text-slate-400 focus:ring-charcoal-accent/50' 
                                         : 'bg-white border-slate-200 text-black placeholder:text-slate-400 focus:ring-black/5'}`}
                                 disabled={isLoading}
                             />
@@ -228,7 +229,7 @@ export default function Chat() {
                             </button>
                         </form>
                         <p className={`text-[10px] text-center mt-4 font-bold uppercase tracking-widest opacity-60 ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>
-                            Powered by Gemini AI
+                            Powered by Llama-3.3-70b AI
                         </p>
                     </div>
                 </div>

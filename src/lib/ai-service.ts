@@ -1,68 +1,44 @@
 import { getFinancialSummary, getSpendingByCategory, getMonthlyTrends, getBudgets, getAccounts, getCategories, createTransaction, addChatMessage, getChatHistory } from './db';
 import type { AIInsight, TransactionFormData } from './types';
 
-// Process chat message and generate AI response using Gemini
+// Process chat message and generate AI response using Groq
 export async function processChatMessage(userId: number, message: string): Promise<{ response: string; action?: string; data?: any }> {
     try {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!process.env.GROQ_API_KEY) {
             return { 
-                response: "AI is not connected. Please set a valid GEMINI_API_KEY in your .env file to start chatting." 
+                response: "AI is not connected. Please set a valid GROQ_API_KEY in your .env file to start chatting." 
             };
         }
 
-        // 1. Gather context data
-        const [summary, budgets, accounts, history, categories] = await Promise.all([
+        // 1. Gather deep context data for all modules (Analytics, Budgets, Transactions)
+        const [summary, budgets, accounts, history, categories, spending, trends] = await Promise.all([
             getFinancialSummary(userId),
             getBudgets(userId),
             getAccounts(userId),
             getChatHistory(userId, 10),
-            getCategories()
+            getCategories(),
+            getSpendingByCategory(userId),
+            getMonthlyTrends(userId, 6)
         ]);
 
         const incomeCategories = categories.filter((c: any) => c.type === 'income');
         const expenseCategories = categories.filter((c: any) => c.type === 'expense');
 
-        // 2. Prepare system prompt
-        const systemPrompt = `You are "SmartBudget AI", a highly capable financial strategist and assistant.
-Your goal is to help the user manage their finances by answering questions, providing insights, and automating transaction tracking.
+        // 2. Prepare detailed multi-module system prompt
+        const systemPrompt = `You are "SmartBudget AI", a master financial strategist.
+You are directly connected to the user's Dashboard, Transactions, Budgets, and Analytics modules.
 
-CURRENT FINANCIAL CONTEXT:
-- Total Balance: ₱${summary.totalBalance.toLocaleString()}
-- Monthly Income: ₱${summary.totalIncome.toLocaleString()}
-- Monthly Expenses: ₱${summary.totalExpenses.toLocaleString()}
-- Savings Rate: ${summary.savingsRate.toFixed(1)}%
-- Active Accounts: ${accounts.map((a: any) => `${a.name} (₱${a.balance})`).join(', ')}
-- Budget Status: ${budgets.map((b: any) => `${b.category_name}: ₱${b.spent}/${b.amount}`).join(', ')}
+MODULE DATA:
+1. DASHBOARD: Total Balance (₱${summary.totalBalance.toLocaleString()}), Monthly Income (₱${summary.totalIncome.toLocaleString()}), Monthly Expenses (₱${summary.totalExpenses.toLocaleString()}), Savings Rate (${summary.savingsRate.toFixed(1)}%).
+2. CATEGORIES: ${categories.map((c: any) => c.name).join(', ')}.
+3. ACCOUNTS: ${accounts.map((a: any) => `${a.name} (₱${a.balance})`).join(', ')}.
+4. BUDGET STATUS: ${budgets.length > 0 ? budgets.map((b: any) => `${b.category_name}: ₱${b.spent}/${b.amount}`).join(', ') : "No budgets set"}.
+5. ANALYTICS (Spending): ${spending.length > 0 ? spending.map(s => `${s.category} (${s.percentage.toFixed(0)}%)`).join(', ') : "No spending yet"}.
+6. ANALYTICS (Trends): ${trends.map(t => `${t.month}: ₱${t.income} in / ₱${t.expenses} out`).join(' | ')}.
 
-AVAILABLE CATEGORIES:
-- Income: ${incomeCategories.map((c: any) => c.name).join(', ')}
-- Expense: ${expenseCategories.map((c: any) => c.name).join(', ')}
+Your goal is to answer questions using this data and act on behalf of the user. If adding money, identify the amount and category.
+Always respond in JSON format with "response", "action", and "transaction_data".`;
 
-CAPABILITIES:
-1. TRACKING: You can add transactions. If the user mentions spending or earning money, identify the amount, type (income/expense), category, and description.
-2. INSIGHTS: Analyze spending trends, budget status, and recommend optimizations.
-3. CONVERSATION: Be helpful, professional, and encouraging. Use ₱ for currency.
-
-RESPONSE FORMAT:
-You MUST respond with a JSON object in the following format:
-{
-  "response": "Your natural language response to the user",
-  "action": "transaction_added" | null,
-  "transaction_data": {
-    "amount": number,
-    "type": "income" | "expense",
-    "description": "string",
-    "category_name": "string",
-    "account_id": number
-  } | null
-}
-
-RULES:
-- If adding a transaction, pick the closest matching category from the lists above.
-- Default to the first account (ID: ${accounts[0]?.id || 1}) if not specified.
-- Keep the natural language response concise and friendly.
-- If no transaction is being added, set "action" and "transaction_data" to null.
-- Always respond in valid JSON.`;
 
 
         // 3. Call Groq via REST API (OpenAI Compatible)
@@ -75,7 +51,8 @@ RULES:
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: "llama3-70b-8192",
+                model: "llama-3.3-70b-versatile",
+                response_format: { type: "json_object" },
                 messages: [
                     { role: "system", content: systemPrompt },
                     ...history.map((m: any) => ({
@@ -98,7 +75,17 @@ RULES:
         const data = await groqResponse.json();
         content = data.choices[0]?.message?.content || '{}';
 
-        const aiResult = JSON.parse(content);
+        // Strip markdown blocks if the LLM wrapped it
+        content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        let aiResult;
+        try {
+            aiResult = JSON.parse(content);
+        } catch (e) {
+            console.error("AI returned non-JSON:", content);
+            aiResult = { response: content, action: null, transaction_data: null };
+        }
+        
         const { response, action, transaction_data } = aiResult;
 
         // 4. Handle Actions

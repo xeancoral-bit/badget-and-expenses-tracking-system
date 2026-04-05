@@ -48,7 +48,8 @@ export default function Sidebar() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const currentMonthTransactions = state.transactions.filter(t => {
-        const tDate = new Date(t.date);
+        const [year, month, day] = t.date.split('-');
+        const tDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
         return tDate >= startOfMonth;
     });
 
