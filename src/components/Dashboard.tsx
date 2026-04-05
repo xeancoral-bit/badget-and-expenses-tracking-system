@@ -61,42 +61,46 @@ export default function Dashboard() {
         })).sort((a, b) => b.amount - a.amount);
     }, [transactions]);
 
-    // Comprehensive logic to connect transactions to dashboard cards
-    const displayBalance = transactions.reduce((sum, t) => {
-        return t.type === 'income' ? sum + Number(t.amount) : sum - Number(t.amount);
-    }, 0);
+    // Comprehensive statistics calculation using useMemo to prevent hydration mismatches
+    const stats = React.useMemo(() => {
+        const d_now = new Date();
+        const d_startOfMonth = new Date(d_now.getFullYear(), d_now.getMonth(), 1);
+        const d_dateStr = d_startOfMonth.toISOString().split('T')[0];
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const dateStr = startOfMonth.toISOString().split('T')[0];
+        // 1. Month Totals
+        const d_currentMonthTransactions = transactions.filter(t => {
+            const [y, m, d] = t.date.split('-');
+            const tDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+            return tDate >= d_startOfMonth;
+        });
 
-    // Current Month Totals
-    const currentMonthTransactions = transactions.filter(t => {
-        const [year, month, day] = t.date.split('-');
-        const tDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        return tDate >= startOfMonth;
-    });
+        const d_monthlyIncome = d_currentMonthTransactions
+            .filter(t => t.type === 'income')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+            
+        const d_monthlyExpenses = d_currentMonthTransactions
+            .filter(t => t.type === 'expense')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    const monthlyIncome = currentMonthTransactions
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        // 2. All-time Totals
+        const d_allTimeIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const d_allTimeExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount || 0), 0);
         
-    const monthlyExpenses = currentMonthTransactions
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        // 3. Final display results
+        const dispIncome = d_monthlyIncome > 0 ? d_monthlyIncome : d_allTimeIncome;
+        const dispExpenses = d_monthlyExpenses > 0 ? d_monthlyExpenses : d_allTimeExpenses;
+        const isAllTime = d_monthlyIncome === 0 && d_monthlyExpenses === 0;
 
-    // All-time Totals for fallback (making it more functional if month is empty)
-    const allTimeIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const allTimeExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    
-    // Final values to display with clear fallback
-    const displayIncome = monthlyIncome > 0 ? monthlyIncome : allTimeIncome;
-    const displayExpenses = monthlyExpenses > 0 ? monthlyExpenses : allTimeExpenses;
-    const isShowingAllTime = monthlyIncome === 0 && monthlyExpenses === 0;
+        return {
+            balance: d_allTimeIncome - d_allTimeExpenses,
+            displayIncome: dispIncome,
+            displayExpenses: dispExpenses,
+            isShowingAllTime: isAllTime,
+            savingsRate: dispIncome > 0 ? ((dispIncome - dispExpenses) / dispIncome) * 100 : 0
+        };
+    }, [transactions]);
 
-    const savingsRate = displayIncome > 0
-        ? ((displayIncome - displayExpenses) / displayIncome) * 100
-        : 0;
+    const { balance: displayBalance, displayIncome, displayExpenses, isShowingAllTime, savingsRate } = stats;
 
     const recentTransactions = transactions.slice(0, 5);
 
