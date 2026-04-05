@@ -5,11 +5,24 @@ import { supabase } from './supabase';
 // ─────────────────────────────────────────────────────────────
 
 export async function getUser() {
+    // 1. Proactive Environment Check
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        throw new Error('Supabase configuration is missing (URL or Anon Key). Please check your environment variables.');
+    }
+
     // Try to get existing user
-    const { data: users, error } = await supabase
-        .from('users')
-        .select('*')
-        .limit(1);
+    let users, error;
+    try {
+        const result = await supabase
+            .from('users')
+            .select('*')
+            .limit(1);
+        users = result.data;
+        error = result.error;
+    } catch (networkError: any) {
+        console.error('Critical Network Failure in local getUser:', networkError);
+        throw new Error(`getUser error: Network or Fetch Failure. This usually means the Supabase URL is incorrect or inaccessible. (${networkError.message})`);
+    }
 
     if (error) throw new Error(`getUser error: ${error.message}`);
 
