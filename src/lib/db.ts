@@ -49,7 +49,7 @@ export async function getUser() {
     }
 
     // Create default demo user
-    const { data: newUser, error: insertError } = await supabase
+    const { data: newUser, error: insertError } = await admin
         .from('users')
         .insert({ name: 'Demo User', email: 'demo@example.com' })
         .select()
@@ -58,7 +58,7 @@ export async function getUser() {
     if (insertError) throw new Error(`createUser error: ${insertError.message}`);
 
     // Create default account
-    await supabase.from('accounts').insert({
+    await admin.from('accounts').insert({
         user_id: newUser.id,
         name: 'Main Account',
         type: 'checking',
@@ -73,7 +73,8 @@ export async function getUser() {
 // ─────────────────────────────────────────────────────────────
 
 export async function getAccounts(userId: number) {
-    const { data, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
         .from('accounts')
         .select('*')
         .eq('user_id', userId)
@@ -421,7 +422,8 @@ export async function getSpendingByCategory(userId: number) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
-    const { data: monthTransactions, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data: monthTransactions, error } = await admin
         .from('transactions')
         .select('amount, categories ( name, color )')
         .eq('user_id', userId)
@@ -434,7 +436,7 @@ export async function getSpendingByCategory(userId: number) {
 
     // All-time fallback if current month is empty
     if (transactionsToUse.length === 0) {
-        const { data: allTransactions } = await supabase
+        const { data: allTransactions } = await admin
             .from('transactions')
             .select('amount, categories ( name, color )')
             .eq('user_id', userId)
@@ -470,7 +472,8 @@ export async function getSpendingByCategory(userId: number) {
 }
 
 export async function getMonthlyTrends(userId: number, months: number = 6) {
-    const { data: transactions, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data: transactions, error } = await admin
         .from('transactions')
         .select('amount, type, date')
         .eq('user_id', userId)

@@ -93,8 +93,8 @@ PROTOCOL:
         const transaction_data = aiResult.transaction_data || null;
 
         // 4. Handle Actions
-        let finalAction = null;
-        let finalData = null;
+        let finalAction: string | undefined = undefined;
+        let finalData: any = undefined;
 
         if (action === 'transaction_added' && transaction_data && transaction_data.amount) {
             try {
