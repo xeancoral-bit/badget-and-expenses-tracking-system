@@ -13,10 +13,11 @@ export async function getUser() {
         throw new Error(`Missing fundamental connectivity credentials. Please verify your Supabase keys.`);
     }
 
+    const admin = getSupabaseAdmin();
     // Try to get existing user
     let users, error;
     try {
-        const result = await supabase
+        const result = await admin
             .from('users')
             .select('*')
             .limit(1);
@@ -30,14 +31,14 @@ export async function getUser() {
 
     if (users && users.length > 0) {
         // Make sure they have at least one account
-        const { data: accounts } = await supabase
+        const { data: accounts } = await admin
             .from('accounts')
             .select('id')
             .eq('user_id', users[0].id)
             .limit(1);
 
         if (!accounts || accounts.length === 0) {
-            await supabase.from('accounts').insert({
+            await admin.from('accounts').insert({
                 user_id: users[0].id,
                 name: 'Main Account',
                 type: 'checking',
@@ -94,7 +95,8 @@ export async function getAccountById(id: number) {
 }
 
 export async function createAccount(userId: number, data: { name: string; type: string; balance: number }) {
-    const { data: account, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data: account, error } = await admin
         .from('accounts')
         .insert({ user_id: userId, ...data })
         .select()
@@ -105,7 +107,8 @@ export async function createAccount(userId: number, data: { name: string; type: 
 }
 
 export async function updateAccount(id: number, data: { name?: string; type?: string; balance?: number }) {
-    const { error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { error } = await admin
         .from('accounts')
         .update(data)
         .eq('id', id);
@@ -114,7 +117,8 @@ export async function updateAccount(id: number, data: { name?: string; type?: st
 }
 
 export async function deleteAccount(id: number) {
-    const { error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { error } = await admin
         .from('accounts')
         .delete()
         .eq('id', id);
@@ -127,7 +131,8 @@ export async function deleteAccount(id: number) {
 // ─────────────────────────────────────────────────────────────
 
 export async function getCategories(type?: string) {
-    let query = supabase.from('categories').select('*').order('name', { ascending: true });
+    const admin = getSupabaseAdmin();
+    let query = admin.from('categories').select('*').order('name', { ascending: true });
 
     if (type) {
         query = query.eq('type', type);
@@ -139,7 +144,8 @@ export async function getCategories(type?: string) {
 }
 
 export async function getCategoryById(id: number) {
-    const { data, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
         .from('categories')
         .select('*')
         .eq('id', id)
@@ -189,7 +195,8 @@ export async function getTransactions(
     userId: number,
     filters?: { accountId?: number; categoryId?: number; startDate?: string; endDate?: string; type?: string }
 ) {
-    let query = supabase
+    const admin = getSupabaseAdmin();
+    let query = admin
         .from('transactions')
         .select(`
             *,
@@ -227,7 +234,8 @@ export async function createTransaction(
     userId: number,
     data: { account_id: number; category_id: number; amount: number; type: string; description: string; date: string }
 ) {
-    const { data: transaction, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data: transaction, error } = await admin
         .from('transactions')
         .insert({ user_id: userId, ...data })
         .select()
@@ -248,14 +256,15 @@ export async function createTransaction(
 }
 
 export async function updateTransaction(id: number, userId: number, data: any) {
+    const admin = getSupabaseAdmin();
     // 1. Get the old transaction to adjust balance
-    const { data: oldTransaction } = await supabase
+    const { data: oldTransaction } = await admin
         .from('transactions')
         .select('*')
         .eq('id', id)
         .single();
 
-    const { data: transaction, error } = await supabase
+    const { data: transaction, error } = await admin
         .from('transactions')
         .update(data)
         .eq('id', id)
@@ -294,8 +303,9 @@ export async function updateTransaction(id: number, userId: number, data: any) {
 }
 
 export async function deleteTransaction(id: number, userId: number) {
+    const admin = getSupabaseAdmin();
     // 1. Get transaction details to adjust account balance
-    const { data: transaction } = await supabase
+    const { data: transaction } = await admin
         .from('transactions')
         .select('*')
         .eq('id', id)
@@ -314,7 +324,7 @@ export async function deleteTransaction(id: number, userId: number) {
     }
 
     // 2. Delete the transaction
-    const { error } = await supabase
+    const { error } = await admin
         .from('transactions')
         .delete()
         .eq('id', id)
@@ -329,7 +339,8 @@ export async function deleteTransaction(id: number, userId: number) {
 // ─────────────────────────────────────────────────────────────
 
 export async function getBudgets(userId: number) {
-    const { data: budgets, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data: budgets, error } = await admin
         .from('budgets')
         .select(`
             *,
@@ -343,7 +354,7 @@ export async function getBudgets(userId: number) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
-    const { data: transactions } = await supabase
+    const { data: transactions } = await admin
         .from('transactions')
         .select('category_id, amount')
         .eq('user_id', userId)
@@ -371,7 +382,8 @@ export async function createBudget(
     userId: number,
     data: { category_id: number; amount: number; period: string; start_date: string }
 ) {
-    const { data: budget, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data: budget, error } = await admin
         .from('budgets')
         .insert({ user_id: userId, ...data })
         .select()
@@ -382,7 +394,8 @@ export async function createBudget(
 }
 
 export async function updateBudget(id: number, data: any) {
-    const { error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { error } = await admin
         .from('budgets')
         .update(data)
         .eq('id', id);
@@ -391,7 +404,8 @@ export async function updateBudget(id: number, data: any) {
 }
 
 export async function deleteBudget(id: number) {
-    const { error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { error } = await admin
         .from('budgets')
         .delete()
         .eq('id', id);
@@ -491,53 +505,65 @@ export async function getMonthlyTrends(userId: number, months: number = 6) {
 }
 
 export async function getFinancialSummary(userId: number) {
+    const admin = getSupabaseAdmin();
     try {
-        const { data: accounts } = await supabase
+        // 1. Snapshot of current liquidity from accounts
+        const { data: accounts } = await admin
             .from('accounts')
             .select('balance')
             .eq('user_id', userId);
 
-        const { data: allTransactions } = await supabase
+        const totalBalance = (accounts || []).reduce((sum, a: any) => sum + Number(a.balance || 0), 0);
+
+        // 2. All-time aggregates (Full history)
+        const { data: allTrans } = await admin
             .from('transactions')
             .select('amount, type')
             .eq('user_id', userId);
 
-        const totalBalance = (allTransactions || []).reduce((sum, t: any) => {
-            return t.type === 'income' ? sum + Number(t.amount) : sum - Number(t.amount);
-        }, 0);
+        let allTimeIncome = 0;
+        let allTimeExpenses = 0;
+        (allTrans || []).forEach((t: any) => {
+            const amt = Number(t.amount || 0);
+            if (t.type === 'income') allTimeIncome += amt;
+            else if (t.type === 'expense') allTimeExpenses += amt;
+        });
 
+        // 3. Current Month aggregates (Monthly view)
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-        const { data: transactions } = await supabase
+        const { data: monthlyTrans } = await admin
             .from('transactions')
             .select('amount, type')
             .eq('user_id', userId)
             .gte('date', startOfMonth)
             .lte('date', endOfMonth);
 
-        let totalIncome = 0;
-        let totalExpenses = 0;
+        let monthlyIncome = 0;
+        let monthlyExpenses = 0;
 
-        (transactions || []).forEach((t: any) => {
+        (monthlyTrans || []).forEach((t: any) => {
             const amount = Number(t.amount || 0);
-            if (t.type === 'income') totalIncome += amount;
-            else if (t.type === 'expense') totalExpenses += amount;
+            if (t.type === 'income') monthlyIncome += amount;
+            else if (t.type === 'expense') monthlyExpenses += amount;
         });
-
-        const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+        
+        const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
 
         return {
             totalBalance,
-            totalIncome,
-            totalExpenses,
+            totalIncome: monthlyIncome,
+            totalExpenses: monthlyExpenses,
+            allTimeIncome,
+            allTimeExpenses,
             savingsRate,
-            transactionsThisMonth: (transactions || []).length,
+            transactionsThisMonth: (monthlyTrans || []).length,
         };
     } catch (err) {
         console.error('getFinancialSummary error:', err);
-        return { totalBalance: 0, totalIncome: 0, totalExpenses: 0, savingsRate: 0, transactionsThisMonth: 0 };
+        return { totalBalance: 0, totalIncome: 0, totalExpenses: 0, allTimeIncome: 0, allTimeExpenses: 0, savingsRate: 0, transactionsThisMonth: 0 };
     }
 }
 
@@ -558,7 +584,8 @@ export async function addChatMessage(userId: number, role: string, content: stri
 }
 
 export async function getChatHistory(userId: number, limit: number = 50) {
-    const { data, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
         .from('chat_messages')
         .select('*')
         .eq('user_id', userId)

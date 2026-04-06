@@ -62,6 +62,8 @@ export interface FinancialSummary {
     totalBalance: number;
     totalIncome: number;
     totalExpenses: number;
+    allTimeIncome: number;
+    allTimeExpenses: number;
     savingsRate: number;
     transactionsThisMonth: number;
 }

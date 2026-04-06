@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, DollarSign, CreditCard, Target, AlertCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { TrendingUp, DollarSign, Wallet, CreditCard, Target, AlertCircle, ArrowUpRight, ArrowDownRight, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
 import { useApp } from '@/lib/AppContext';
 import { format } from 'date-fns';
 
@@ -61,46 +61,54 @@ export default function Dashboard() {
         })).sort((a, b) => b.amount - a.amount);
     }, [transactions]);
 
-    // Comprehensive statistics calculation using useMemo to prevent hydration mismatches
+    // ─── CORE FIX: Dual-source statistics (server summary + client transactions) ───
+    // The server summary is the PRIMARY source, but if it hasn't refreshed yet,
+    // we calculate from the client-side transaction list as an immediate fallback.
     const stats = React.useMemo(() => {
-        const d_now = new Date();
-        const d_startOfMonth = new Date(d_now.getFullYear(), d_now.getMonth(), 1);
-        const d_dateStr = d_startOfMonth.toISOString().split('T')[0];
-
-        // 1. Month Totals
-        const d_currentMonthTransactions = transactions.filter(t => {
-            const [y, m, d] = t.date.split('-');
-            const tDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-            return tDate >= d_startOfMonth;
-        });
-
-        const d_monthlyIncome = d_currentMonthTransactions
+        // Client-side calculation from transaction list (always available after refresh)
+        const clientAllTimeIncome = transactions
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-            
-        const d_monthlyExpenses = d_currentMonthTransactions
+        const clientAllTimeExpenses = transactions
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        // 2. All-time Totals
-        const d_allTimeIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-        const d_allTimeExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-        
-        // 3. Final display results
-        const dispIncome = d_monthlyIncome > 0 ? d_monthlyIncome : d_allTimeIncome;
-        const dispExpenses = d_monthlyExpenses > 0 ? d_monthlyExpenses : d_allTimeExpenses;
-        const isAllTime = d_monthlyIncome === 0 && d_monthlyExpenses === 0;
+        // Server-side values (from getFinancialSummary API)
+        const serverAllTimeIncome = summary?.allTimeIncome || 0;
+        const serverAllTimeExpenses = summary?.allTimeExpenses || 0;
+        const serverBalance = summary?.totalBalance || 0;
+
+        // Use whichever source has the LARGER value — this handles the race condition
+        // where transactions have refreshed but summary hasn't yet, or vice versa.
+        const allTimeIncome = Math.max(serverAllTimeIncome, clientAllTimeIncome);
+        const allTimeExpenses = Math.max(serverAllTimeExpenses, clientAllTimeExpenses);
+
+        // Balance: prefer server (accounts table), fallback to income - expenses
+        const balance = serverBalance > 0 ? serverBalance : (allTimeIncome - allTimeExpenses);
+
+        // Savings Rate: (Income - Expenses) / Income * 100
+        // This tells you: "Of all money earned, what % did you keep?"
+        const savingsRate = allTimeIncome > 0 
+            ? ((allTimeIncome - allTimeExpenses) / allTimeIncome) * 100 
+            : 0;
 
         return {
-            balance: d_allTimeIncome - d_allTimeExpenses,
-            displayIncome: dispIncome,
-            displayExpenses: dispExpenses,
-            isShowingAllTime: isAllTime,
-            savingsRate: dispIncome > 0 ? ((dispIncome - dispExpenses) / dispIncome) * 100 : 0
+            balance,
+            allTimeIncome,
+            allTimeExpenses,
+            savingsRate,
         };
-    }, [transactions]);
+    }, [summary, transactions]);
 
-    const { balance: displayBalance, displayIncome, displayExpenses, isShowingAllTime, savingsRate } = stats;
+    // Savings rate interpretation
+    const savingsRateInfo = React.useMemo(() => {
+        const rate = stats.savingsRate;
+        if (rate >= 30) return { label: 'Excellent', color: 'text-emerald-500', bg: 'bg-emerald-500', icon: ShieldCheck };
+        if (rate >= 20) return { label: 'Healthy', color: 'text-emerald-500', bg: 'bg-emerald-500', icon: ShieldCheck };
+        if (rate >= 10) return { label: 'Moderate', color: 'text-amber-500', bg: 'bg-amber-500', icon: ShieldAlert };
+        if (rate >= 0)  return { label: 'Low', color: 'text-red-500', bg: 'bg-red-500', icon: ShieldX };
+        return { label: 'Deficit', color: 'text-red-600', bg: 'bg-red-600', icon: ShieldX };
+    }, [stats.savingsRate]);
 
     const recentTransactions = transactions.slice(0, 5);
 
@@ -108,74 +116,105 @@ export default function Dashboard() {
         <div className="space-y-6 animate-fadeIn pb-10">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold text-text-primary tracking-tight">Financial Overview</h2>
-                    <p className="text-text-secondary mt-1 font-medium">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+                    <h2 className="text-3xl font-black text-text-primary tracking-tight">Financial Overview</h2>
+                    <p className="text-text-muted text-sm font-medium">Tracking your wealth in real-time.</p>
                 </div>
-                <div className="flex gap-3">
-                    <button className="btn btn-secondary flex items-center gap-2">
-                        <TrendingUp size={18} />
-                        <span>Download Report</span>
-                    </button>
+                <div className="hidden md:flex items-center gap-3">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">All Time Net</span>
+                        <span className={`text-sm font-black ${(stats.allTimeIncome - stats.allTimeExpenses) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {(stats.allTimeIncome - stats.allTimeExpenses) >= 0 ? '+' : ''}₱{(stats.allTimeIncome - stats.allTimeExpenses).toLocaleString()}
+                        </span>
+                    </div>
                 </div>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Total Balance */}
                 <div className="stat-card border-accent/20">
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-text-muted text-xs uppercase tracking-widest font-bold">Total Balance</span>
                         <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
-                            <DollarSign className="text-accent" size={20} />
+                            <Wallet className="text-accent" size={20} />
                         </div>
                     </div>
-                    <p className="text-2xl font-bold text-text-primary tracking-tighter">₱{displayBalance.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-text-primary tracking-tighter">₱{stats.balance.toLocaleString()}</p>
                     <div className="flex items-center gap-2 mt-2">
                         <span className="text-[10px] text-emerald-600 font-bold px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 rounded">SAFE</span>
                         <span className="text-xs text-text-muted">Available now</span>
                     </div>
                 </div>
 
-                <div className="stat-card border-emerald-500/20">
+                {/* Income — All-Time Total */}
+                <div className="stat-card border-emerald-500/20 group">
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-text-muted text-xs uppercase tracking-widest font-bold">Income</span>
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <ArrowUpRight className="text-emerald-500" size={20} />
                         </div>
                     </div>
-                    <p className="text-2xl font-bold text-emerald-600 tracking-tighter">₱{displayIncome.toLocaleString()}</p>
+                    <p 
+                        id="d_alltimeincome"
+                        key={`inc-${stats.allTimeIncome}`}
+                        className="text-2xl font-bold text-emerald-600 tracking-tighter animate-fadeIn"
+                    >
+                        ₱{stats.allTimeIncome.toLocaleString()}
+                    </p>
                     <p className="text-[10px] uppercase font-bold text-text-muted mt-2 tracking-wider">
-                        {isShowingAllTime ? 'Overall Earnings' : 'Current Month Earnings'}
+                        Overall Earnings
                     </p>
                 </div>
 
-                <div className="stat-card border-red-500/20">
+                {/* Expenses — All-Time Total */}
+                <div className="stat-card border-red-500/20 group">
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-text-muted text-xs uppercase tracking-widest font-bold">Expenses</span>
-                        <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                             <ArrowDownRight className="text-red-500" size={20} />
                         </div>
                     </div>
-                    <p className="text-2xl font-bold text-red-600 tracking-tighter">₱{displayExpenses.toLocaleString()}</p>
+                    <p 
+                        id="d_alltimeexpenses"
+                        key={`exp-${stats.allTimeExpenses}`}
+                        className="text-2xl font-bold text-red-600 tracking-tighter animate-fadeIn"
+                    >
+                        ₱{stats.allTimeExpenses.toLocaleString()}
+                    </p>
                     <p className="text-[10px] uppercase font-bold text-text-muted mt-2 tracking-wider">
-                        {isShowingAllTime ? 'Overall Spending' : 'Current Month Spending'}
+                        Overall Spending
                     </p>
                 </div>
 
+                {/* Savings Rate — Meaningful visualization */}
                 <div className="stat-card">
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-text-muted text-xs uppercase tracking-widest font-bold">Savings Rate</span>
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                            <TrendingUp className={savingsRate >= 0 ? 'text-emerald-500' : 'text-red-500'} size={20} />
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            stats.savingsRate >= 20 ? 'bg-emerald-500/10' : stats.savingsRate >= 10 ? 'bg-amber-500/10' : 'bg-red-500/10'
+                        }`}>
+                            {React.createElement(savingsRateInfo.icon, { 
+                                className: savingsRateInfo.color, 
+                                size: 20 
+                            })}
                         </div>
                     </div>
-                    <p className={`text-2xl font-bold tracking-tighter ${savingsRate >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {savingsRate.toFixed(1)}%
+                    <p className={`text-2xl font-bold tracking-tighter ${savingsRateInfo.color}`}>
+                        {stats.savingsRate.toFixed(1)}%
                     </p>
                     <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
                         <div
-                            className={`h-full rounded-full transition-all duration-500 ${savingsRate >= 20 ? 'bg-emerald-500' : savingsRate >= 10 ? 'bg-amber-500' : 'bg-red-500'}`}
-                            style={{ width: `${Math.max(0, Math.min(savingsRate, 100))}%` }}
+                            className={`h-full rounded-full transition-all duration-700 ${savingsRateInfo.bg}`}
+                            style={{ width: `${Math.max(0, Math.min(stats.savingsRate, 100))}%` }}
                         />
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${savingsRateInfo.color}`}>
+                            {savingsRateInfo.label}
+                        </span>
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                            ₱{(stats.allTimeIncome - stats.allTimeExpenses).toLocaleString()} saved
+                        </span>
                     </div>
                 </div>
             </div>
@@ -242,12 +281,12 @@ export default function Dashboard() {
                                             <div>
                                                 <p className="text-text-primary font-bold">{transaction.description}</p>
                                                 <p className="text-xs text-text-muted font-medium mt-1">
-                                                    {transaction.category?.name || 'Uncategorized'} • {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                                    {transaction.category?.name || (transaction as any).category_name || 'Uncategorized'} • {format(new Date(transaction.date), 'MMM d, yyyy')}
                                                 </p>
                                             </div>
                                         </div>
                                         <span className={`text-lg font-black ${transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
-                                            {transaction.type === 'income' ? '+' : '-'}₱{transaction.amount.toLocaleString()}
+                                            {transaction.type === 'income' ? '+' : '-'}₱{Number(transaction.amount).toLocaleString()}
                                         </span>
                                     </div>
                                 ))}

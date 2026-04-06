@@ -73,7 +73,9 @@ export default function Chat() {
 
             // Refresh data if a transaction was added
             if (data.action === 'transaction_added') {
-                refreshData();
+                // Small delay to let DB commit propagate, then await full refresh
+                await new Promise(resolve => setTimeout(resolve, 300));
+                await refreshData();
                 addNotification('Transaction added successfully!', 'success');
             }
         } catch (error: any) {

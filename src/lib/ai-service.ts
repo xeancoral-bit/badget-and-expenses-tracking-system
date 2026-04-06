@@ -33,18 +33,24 @@ You are directly connected to the user's Dashboard, Transactions, Budgets, and A
 MODULE DATA:
 1. DASHBOARD: Total Balance (₱${summary.totalBalance.toLocaleString()}), Monthly Income (₱${summary.totalIncome.toLocaleString()}), Monthly Expenses (₱${summary.totalExpenses.toLocaleString()}), Savings Rate (${summary.savingsRate.toFixed(1)}%).
 2. CATEGORIES: ${categories.map((c: any) => c.name).join(', ')}.
-3. ACCOUNTS: ${accounts.map((a: any) => `${a.name} (₱${a.balance})`).join(', ')}.
+3. ACCOUNTS: ${accounts.map((a: any) => `${a.name} (ID: ${a.id}, Balance: ₱${a.balance})`).join(', ')}.
 4. BUDGET STATUS: ${budgets.length > 0 ? budgets.map((b: any) => `${b.category_name}: ₱${b.spent}/${b.amount}`).join(', ') : "No budgets set"}.
 5. ANALYTICS (Spending): ${spending.length > 0 ? spending.map(s => `${s.category} (${s.percentage.toFixed(0)}%)`).join(', ') : "No spending yet"}.
-6. ANALYTICS (Trends): ${trends.map(t => `${t.month}: ₱${t.income} in / ₱${t.expenses} out`).join(' | ')}.
 
-Your goal is to answer questions using this data and act on behalf of the user. If adding money, identify the amount and category.
-Always respond in JSON format with "response", "action", and "transaction_data".`;
+PROTOCOL:
+- If the user wants to add an income or expense:
+  - Set "action" to "transaction_added".
+  - Set "transaction_data" to include: 
+    - "amount": number (positive)
+    - "type": "income" or "expense"
+    - "category_name": One of the CATEGORIES above (be smart, e.g. "Salary" for income).
+    - "description": Short string.
+    - "account_id": The ID of the account to use (default to ${accounts[0]?.id || 1}).
+- For general questions, set "action" to null.
+- Always respond in VALID JSON format with "response", "action", and "transaction_data".`;
 
-
-
-        // 3. Call Groq via REST API (OpenAI Compatible)
-        let aiResult: any = { response: "I'm sorry, I'm having trouble processing that right now.", action: null, data: null };
+        // 3. Call Groq via REST API
+        let aiResult: any = { response: "I'm sorry, I'm having trouble processing that right now.", action: null, transaction_data: null };
         
         try {
             const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -64,31 +70,22 @@ Always respond in JSON format with "response", "action", and "transaction_data".
                         })),
                         { role: "user", content: message }
                     ],
-                    temperature: 0.7, // Lower temp for more predictable JSON
-                    max_completion_tokens: 4096,
-                    top_p: 1
+                    temperature: 0.1, // Very low temp for strict JSON
+                    max_completion_tokens: 1024,
                 })
             });
 
             if (!groqResponse.ok) {
                 const groqError = await groqResponse.json();
-                console.error("Groq API Error Detail:", groqError);
                 throw new Error(`Groq API Error: ${groqError.error?.message || 'Unknown error'}`);
             }
 
             const groqData = await groqResponse.json();
             const rawContent = groqData.choices[0]?.message?.content || '{}';
-            
-            // Safety cleaning of content
-            const cleanedContent = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-            aiResult = JSON.parse(cleanedContent);
+            aiResult = JSON.parse(rawContent);
             
         } catch (jsonError) {
             console.error("AI returned non-JSON or Groq failed:", jsonError);
-            // If it's a raw string, we try to use it as response
-            if (typeof aiResult === 'string') {
-                aiResult = { response: aiResult, action: null, transaction_data: null };
-            }
         }
         
         const response = aiResult.response || "I've processed your request.";
@@ -96,15 +93,14 @@ Always respond in JSON format with "response", "action", and "transaction_data".
         const transaction_data = aiResult.transaction_data || null;
 
         // 4. Handle Actions
-        let finalAction = action;
+        let finalAction = null;
         let finalData = null;
 
-        if (action === 'transaction_added' && transaction_data) {
+        if (action === 'transaction_added' && transaction_data && transaction_data.amount) {
             try {
-                // Find category ID
                 const transType = transaction_data.type || 'expense';
                 const allCats = await getCategories(transType);
-                const categoryName = transaction_data.category_name || 'Other';
+                const categoryName = transaction_data.category_name || (transType === 'income' ? 'Salary' : 'Other');
                 
                 const category = allCats.find((c: any) => 
                     c.name.toLowerCase() === categoryName.toLowerCase() ||
@@ -112,18 +108,19 @@ Always respond in JSON format with "response", "action", and "transaction_data".
                     c.name.toLowerCase().includes(categoryName.toLowerCase())
                 );
 
-                const finalCategoryId = category ? category.id : (allCats.find((c: any) => c.name.toLowerCase().includes('other'))?.id || allCats[0]?.id || 10);
+                const finalCategoryId = category ? category.id : (allCats.find((c: any) => c.name.toLowerCase().includes('other'))?.id || allCats[0]?.id || (transType === 'income' ? 1 : 10));
 
                 const transactionData: TransactionFormData = {
                     account_id: transaction_data.account_id || accounts[0]?.id || 1,
-                    amount: Math.abs(transaction_data.amount || 0),
-                    type: transType,
-                    description: transaction_data.description || 'AI Generated Transaction',
+                    amount: Math.abs(transaction_data.amount),
+                    type: transType as 'income' | 'expense',
+                    description: transaction_data.description || `AI Added ${transType}`,
                     category_id: finalCategoryId,
                     date: new Date().toISOString().split('T')[0]
                 };
 
                 await createTransaction(userId, transactionData);
+                finalAction = 'transaction_added';
                 finalData = transactionData;
             } catch (actError) {
                 console.error("Action handler failed:", actError);
