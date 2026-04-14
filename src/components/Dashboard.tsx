@@ -61,11 +61,7 @@ export default function Dashboard() {
         })).sort((a, b) => b.amount - a.amount);
     }, [transactions]);
 
-    // ─── CORE FIX: Dual-source statistics (server summary + client transactions) ───
-    // The server summary is the PRIMARY source, but if it hasn't refreshed yet,
-    // we calculate from the client-side transaction list as an immediate fallback.
     const stats = React.useMemo(() => {
-        // Client-side calculation from transaction list (always available after refresh)
         const clientAllTimeIncome = transactions
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -73,21 +69,13 @@ export default function Dashboard() {
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-        // Server-side values (from getFinancialSummary API)
         const serverAllTimeIncome = summary?.allTimeIncome || 0;
         const serverAllTimeExpenses = summary?.allTimeExpenses || 0;
-        const serverBalance = summary?.totalBalance || 0;
 
-        // Use whichever source has the LARGER value — this handles the race condition
-        // where transactions have refreshed but summary hasn't yet, or vice versa.
         const allTimeIncome = Math.max(serverAllTimeIncome, clientAllTimeIncome);
         const allTimeExpenses = Math.max(serverAllTimeExpenses, clientAllTimeExpenses);
 
-        // Balance: prefer server (accounts table), fallback to income - expenses
-        const balance = serverBalance > 0 ? serverBalance : (allTimeIncome - allTimeExpenses);
-
-        // Savings Rate: (Income - Expenses) / Income * 100
-        // This tells you: "Of all money earned, what % did you keep?"
+        const balance = allTimeIncome - allTimeExpenses;
         const savingsRate = allTimeIncome > 0 
             ? ((allTimeIncome - allTimeExpenses) / allTimeIncome) * 100 
             : 0;

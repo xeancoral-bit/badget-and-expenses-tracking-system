@@ -85,13 +85,17 @@ export async function getAccounts(userId: number) {
 }
 
 export async function getAccountById(id: number) {
-    const { data, error } = await supabase
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
         .from('accounts')
         .select('*')
         .eq('id', id)
         .single();
 
-    if (error) return null;
+    if (error) {
+        console.error(`getAccountById error for id ${id}:`, error.message);
+        return null;
+    }
     return data;
 }
 
@@ -532,7 +536,11 @@ export async function getFinancialSummary(userId: number) {
             else if (t.type === 'expense') allTimeExpenses += amt;
         });
 
-        // 3. Current Month aggregates (Monthly view)
+        // 3. Savings Rate Logic (User requested it detect accurately)
+        // If they mean all-time savings rate:
+        const allTimeSavingsRate = allTimeIncome > 0 ? ((allTimeIncome - allTimeExpenses) / allTimeIncome) * 100 : 0;
+        
+        // Month specific aggregates
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -553,7 +561,7 @@ export async function getFinancialSummary(userId: number) {
             else if (t.type === 'expense') monthlyExpenses += amount;
         });
         
-        const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
+        const monthlySavingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
 
         return {
             totalBalance,
@@ -561,7 +569,8 @@ export async function getFinancialSummary(userId: number) {
             totalExpenses: monthlyExpenses,
             allTimeIncome,
             allTimeExpenses,
-            savingsRate,
+            savingsRate: allTimeSavingsRate, // defaulting to all-time for "detect" clarity
+            monthlySavingsRate,
             transactionsThisMonth: (monthlyTrans || []).length,
         };
     } catch (err) {

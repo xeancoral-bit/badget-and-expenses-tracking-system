@@ -1,18 +1,20 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getFinancialSummary, getSpendingByCategory, getMonthlyTrends, getBudgets, getAccounts, getCategories, createTransaction, addChatMessage, getChatHistory } from './db';
 import type { AIInsight, TransactionFormData } from './types';
 
-// Process chat message and generate AI response using Groq
+// Process chat message and generate AI response
 export async function processChatMessage(userId: number, message: string): Promise<{ response: string; action?: string; data?: any }> {
     try {
-        const groqKey = process.env.GROQ_API_KEY || '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';
+        const groqKey = process.env.GROQ_API_KEY;
+        const geminiKey = process.env.GEMINI_API_KEY;
         
-        if (!groqKey) {
+        if (!groqKey && !geminiKey) {
             return { 
-                response: "AI connectivity is truly missing. Please check your credentials." 
+                response: "AI connectivity is missing. Please check your GEMINI_API_KEY or GROQ_API_KEY in the environment." 
             };
         }
 
-        // 1. Gather deep context data for all modules (Analytics, Budgets, Transactions)
+        // 1. Gather context data
         const [summary, budgets, accounts, history, categories, spending, trends] = await Promise.all([
             getFinancialSummary(userId),
             getBudgets(userId),
@@ -23,80 +25,96 @@ export async function processChatMessage(userId: number, message: string): Promi
             getMonthlyTrends(userId, 6)
         ]);
 
-        const incomeCategories = categories.filter((c: any) => c.type === 'income');
-        const expenseCategories = categories.filter((c: any) => c.type === 'expense');
-
-        // 2. Prepare detailed multi-module system prompt
+        // 2. Prepare system prompt
         const systemPrompt = `You are "SmartBudget AI", a master financial strategist.
 You are directly connected to the user's Dashboard, Transactions, Budgets, and Analytics modules.
 
-FINANCIAL CONTEXT (VERY IMPORTANT):
-1. MONTHLY STATS (Current Month):
-   - Income: ₱${summary.totalIncome.toLocaleString()}
-   - Expenses: ₱${summary.totalExpenses.toLocaleString()}
-   - Savings Rate: ${summary.savingsRate.toFixed(1)}%
-2. ALL-TIME STATS (Since Account Creation):
-   - Total Balance (Current Liquidity): ₱${summary.totalBalance.toLocaleString()}
-   - Overall Earnings (All-Time Income): ₱${summary.allTimeIncome.toLocaleString()}
-   - Overall Spending (All-Time Expenses): ₱${summary.allTimeExpenses.toLocaleString()}
-
-OTHER MODULE DATA:
-3. CATEGORIES: ${categories.map((c: any) => c.name).join(', ')}.
-4. ACCOUNTS: ${accounts.map((a: any) => `${a.name} (ID: ${a.id}, Balance: ₱${a.balance})`).join(', ')}.
-5. BUDGET STATUS: ${budgets.length > 0 ? budgets.map((b: any) => `${b.category_name}: ₱${b.spent}/${b.amount}`).join(', ') : "No budgets set"}.
-6. ANALYTICS (Spending): ${spending.length > 0 ? spending.map(s => `${s.category} (${s.percentage.toFixed(0)}%)`).join(', ') : "No spending yet"}.
+FINANCIAL CONTEXT:
+- Monthly Income: ₱${summary.totalIncome.toLocaleString()}
+- Monthly Expenses: ₱${summary.totalExpenses.toLocaleString()}
+- Total Balance: ₱${summary.totalBalance.toLocaleString()}
+- Savings Rate: ${summary.savingsRate.toFixed(1)}%
+- Categories: ${categories.map((c: any) => c.name).join(', ')}
+- Accounts: ${accounts.map((a: any) => `${a.name} (₱${a.balance})`).join(', ')}
 
 PROTOCOL:
-- If asked about "Total Balance", "Income", "Expenses", or "Savings Rate", always use the numbers provided above.
-- Be precise. If the user asks for their total balance, say exactly ₱${summary.totalBalance.toLocaleString()}.
-- If the user wants to add an income or expense:
-  - Set "action" to "transaction_added".
-  - Set "transaction_data" to include: 
-    - "amount": number (positive)
-    - "type": "income" or "expense"
-    - "category_name": One of the CATEGORIES above.
-    - "description": Short string.
-    - "account_id": The ID of the account to use (default to ${accounts[0]?.id || 1}).
-- For general questions, set "action" to null.
-- Always respond in VALID JSON format with "response", "action", and "transaction_data".`;
+- Respond in VALID JSON ONLY.
+- Structure: { "response": "string", "action": string|null, "transaction_data": object|null }
+- For finance queries, use the exact numbers above.`;
 
-        // 3. Call Groq via REST API
-        let aiResult: any = { response: "I'm sorry, I'm having trouble processing that right now.", action: null, transaction_data: null };
-        
-        try {
-            const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${groqKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: "llama-3.3-70b-versatile",
-                    response_format: { type: "json_object" },
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        ...history.map((m: any) => ({
-                            role: m.role === 'assistant' ? 'assistant' : 'user',
-                            content: m.content
-                        })),
-                        { role: "user", content: message }
-                    ],
-                    temperature: 0.1, // Very low temp for strict JSON
-                    max_completion_tokens: 1024,
-                })
-            });
+        let aiResult: any = { 
+            response: "I'm having trouble connecting to my AI core. Please ensure your GEMINI_API_KEY or GROQ_API_KEY is correctly set in your Vercel project settings.", 
+            action: null, 
+            transaction_data: null 
+        };
 
-            if (!groqResponse.ok) {
-                const groqError = await groqResponse.json();
-                throw new Error(`Groq API Error: ${groqError.error?.message || 'Unknown error'}`);
+        // 3. Try Gemini first (Optimized for Vercel)
+        if (geminiKey) {
+            try {
+                const genAI = new GoogleGenerativeAI(geminiKey);
+                const model = genAI.getGenerativeModel({ 
+                    model: "gemini-1.5-flash",
+                    systemInstruction: systemPrompt,
+                    generationConfig: { responseMimeType: "application/json" }
+                });
+
+                const chatHistory = history.map(m => ({
+                    role: m.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: m.content }]
+                }));
+
+                const chat = model.startChat({ history: chatHistory });
+                const result = await chat.sendMessage(message);
+                const text = result.response.text();
+                
+                // Robust parsing: Clean markdown code blocks if present
+                const cleanJson = text.replace(/```json|```/g, '').trim();
+                aiResult = JSON.parse(cleanJson);
+            } catch (geminiError: any) {
+                console.error("Gemini failed:", geminiError.message);
+                if (!groqKey) {
+                    aiResult.response = `Gemini connection error: ${geminiError.message || "Unknown error"}. Please check your Gemini API key.`;
+                }
             }
+        }
 
-            const groqData = await groqResponse.json();
-            const rawContent = groqData.choices[0]?.message?.content || '{}';
-            aiResult = JSON.parse(rawContent);
-            
-        } catch (jsonError) {
-            console.error("AI returned non-JSON or Groq failed:", jsonError);
+        // 4. Try Groq (Fallback)
+        if ((!aiResult.response || aiResult.response.includes("having trouble")) && groqKey) {
+            try {
+                const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${groqKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: "llama-3.3-70b-versatile",
+                        response_format: { type: "json_object" },
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            ...history.map((m: any) => ({
+                                role: m.role === 'assistant' ? 'assistant' : 'user',
+                                content: m.content
+                            })),
+                            { role: "user", content: message }
+                        ],
+                        temperature: 0.1,
+                    })
+                });
+
+                if (groqResponse.ok) {
+                    const groqData = await groqResponse.json();
+                    const content = groqData.choices[0]?.message?.content || '{}';
+                    const cleanJson = content.replace(/```json|```/g, '').trim();
+                    aiResult = JSON.parse(cleanJson);
+                } else {
+                    const errorData = await groqResponse.json();
+                    aiResult.response = `Groq API returned an error: ${errorData.error?.message || "Unknown error"}.`;
+                }
+            } catch (groqError: any) {
+                console.error("Groq fallback failed:", groqError.message);
+                aiResult.response = `AI connection failed (both Gemini and Groq). Error: ${groqError.message}`;
+            }
         }
         
         const response = aiResult.response || "I've processed your request.";
