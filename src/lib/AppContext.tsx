@@ -22,6 +22,7 @@ interface AppState {
     theme: 'light' | 'dark';
     showAddTransactionModal: boolean;
     showAddBudgetModal: boolean;
+    preferredAI: 'gemini' | 'groq';
 }
 
 type AppAction =
@@ -47,7 +48,8 @@ type AppAction =
     | { type: 'TOGGLE_THEME' }
     | { type: 'ADD_TRANSACTION_SHORTCUT' }
     | { type: 'ADD_BUDGET_SHORTCUT' }
-    | { type: 'CLOSE_MODALS' };
+    | { type: 'CLOSE_MODALS' }
+    | { type: 'SET_PREFERRED_AI'; payload: 'gemini' | 'groq' };
 
 const initialState: AppState = {
     user: null,
@@ -68,6 +70,7 @@ const initialState: AppState = {
     theme: 'light',
     showAddTransactionModal: false,
     showAddBudgetModal: false,
+    preferredAI: 'gemini',
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -165,6 +168,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
                 showAddTransactionModal: false,
                 showAddBudgetModal: false
             };
+        case 'SET_PREFERRED_AI':
+            return { ...state, preferredAI: action.payload };
         default:
             return state;
     }
@@ -202,7 +207,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (Array.isArray(accountsRes)) dispatch({ type: 'SET_ACCOUNTS', payload: accountsRes });
             if (Array.isArray(transactionsRes)) dispatch({ type: 'SET_TRANSACTIONS', payload: transactionsRes });
             if (Array.isArray(budgetsRes)) dispatch({ type: 'SET_BUDGETS', payload: budgetsRes });
-            if (Array.isArray(categoriesRes)) dispatch({ type: 'SET_CATEGORIES', payload: categoriesRes });
+            if (Array.isArray(categoriesRes)) {
+                // Force unique categories by name and type to prevent "balikbalik" in UI
+                const uniqueCategories = categoriesRes.filter((c, index, self) => 
+                    index === self.findIndex((t) => (
+                        t.name === c.name && t.type === c.type
+                    ))
+                );
+                dispatch({ type: 'SET_CATEGORIES', payload: uniqueCategories });
+            }
             if (summaryRes && !summaryRes.error) dispatch({ type: 'SET_SUMMARY', payload: summaryRes });
             if (Array.isArray(spendingRes)) dispatch({ type: 'SET_SPENDING', payload: spendingRes });
             if (Array.isArray(trendsRes)) dispatch({ type: 'SET_TRENDS', payload: trendsRes });

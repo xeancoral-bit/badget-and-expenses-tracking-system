@@ -3,7 +3,7 @@ import { getFinancialSummary, getSpendingByCategory, getMonthlyTrends, getBudget
 import type { AIInsight, TransactionFormData } from './types';
 
 // Process chat message and generate AI response
-export async function processChatMessage(userId: number, message: string): Promise<{ response: string; action?: string; data?: any }> {
+export async function processChatMessage(userId: number, message: string, preferredProvider?: 'gemini' | 'groq'): Promise<{ response: string; action?: string; data?: any }> {
     try {
         const groqKey = process.env.GROQ_API_KEY;
         const geminiKey = process.env.GEMINI_API_KEY;
@@ -40,6 +40,7 @@ FINANCIAL CONTEXT:
 PROTOCOL:
 - Respond in VALID JSON ONLY.
 - Structure: { "response": "string", "action": string|null, "transaction_data": object|null }
+- To add a transaction, use: "action": "transaction_added"
 - For finance queries, use the exact numbers above.`;
 
         let aiResult: any = { 
@@ -48,12 +49,13 @@ PROTOCOL:
             transaction_data: null 
         };
 
-        // 3. Try Gemini first (Optimized for Vercel)
-        if (geminiKey) {
+        // 3. AI Execution Logic based on preference
+        const tryGemini = async () => {
+            if (!geminiKey) return null;
             try {
                 const genAI = new GoogleGenerativeAI(geminiKey);
                 const model = genAI.getGenerativeModel({ 
-                    model: "gemini-1.5-flash",
+                    model: "gemini-flash-latest",
                     systemInstruction: systemPrompt,
                     generationConfig: { responseMimeType: "application/json" }
                 });
@@ -67,19 +69,16 @@ PROTOCOL:
                 const result = await chat.sendMessage(message);
                 const text = result.response.text();
                 
-                // Robust parsing: Clean markdown code blocks if present
                 const cleanJson = text.replace(/```json|```/g, '').trim();
-                aiResult = JSON.parse(cleanJson);
-            } catch (geminiError: any) {
-                console.error("Gemini failed:", geminiError.message);
-                if (!groqKey) {
-                    aiResult.response = `Gemini connection error: ${geminiError.message || "Unknown error"}. Please check your Gemini API key.`;
-                }
+                return JSON.parse(cleanJson);
+            } catch (err) {
+                console.error("Gemini failed:", err);
+                return null;
             }
-        }
+        };
 
-        // 4. Try Groq (Fallback)
-        if ((!aiResult.response || aiResult.response.includes("having trouble")) && groqKey) {
+        const tryGroq = async () => {
+            if (!groqKey) return null;
             try {
                 const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
@@ -106,15 +105,19 @@ PROTOCOL:
                     const groqData = await groqResponse.json();
                     const content = groqData.choices[0]?.message?.content || '{}';
                     const cleanJson = content.replace(/```json|```/g, '').trim();
-                    aiResult = JSON.parse(cleanJson);
-                } else {
-                    const errorData = await groqResponse.json();
-                    aiResult.response = `Groq API returned an error: ${errorData.error?.message || "Unknown error"}.`;
+                    return JSON.parse(cleanJson);
                 }
-            } catch (groqError: any) {
-                console.error("Groq fallback failed:", groqError.message);
-                aiResult.response = `AI connection failed (both Gemini and Groq). Error: ${groqError.message}`;
+                return null;
+            } catch (err) {
+                console.error("Groq failed:", err);
+                return null;
             }
+        };
+
+        if (preferredProvider === 'groq') {
+            aiResult = (await tryGroq()) || (await tryGemini()) || aiResult;
+        } else {
+            aiResult = (await tryGemini()) || (await tryGroq()) || aiResult;
         }
         
         const response = aiResult.response || "I've processed your request.";
@@ -151,8 +154,11 @@ PROTOCOL:
                 await createTransaction(userId, transactionData);
                 finalAction = 'transaction_added';
                 finalData = transactionData;
-            } catch (actError) {
+            } catch (actError: any) {
                 console.error("Action handler failed:", actError);
+                return { 
+                    response: `I tried to add that transaction, but encountered a database error: ${actError.message || 'Unknown error'}. Please ensure your Supabase connection is active.` 
+                };
             }
         }
 

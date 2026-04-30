@@ -9,3 +9,7 @@ node_modules
 *.db-shm
 *.db-wal
 supabase/.temp/
+
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md

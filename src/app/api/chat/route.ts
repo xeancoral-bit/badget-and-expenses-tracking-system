@@ -9,7 +9,7 @@ export async function POST(request: Request) {
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
         const body = await request.json();
-        const result = await processChatMessage(user.id, body.message);
+        const result = await processChatMessage(user.id, body.message, body.provider);
 
         return NextResponse.json(result);
     } catch (error: any) {

@@ -6,7 +6,7 @@ import { useApp } from '@/lib/AppContext';
 
 export default function Chat() {
     const { state, dispatch, refreshData } = useApp();
-    const { chatOpen, chatMessages, theme } = state;
+    const { chatOpen, chatMessages, theme, preferredAI } = state;
     const isDark = theme === 'dark';
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +47,10 @@ export default function Chat() {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userMessage }),
+                body: JSON.stringify({ 
+                    message: userMessage,
+                    provider: preferredAI 
+                }),
             });
 
             const data = await response.json();
@@ -135,7 +138,7 @@ export default function Chat() {
                                 <h3 className={`text-sm font-black tracking-wider uppercase ${isDark ? 'text-charcoal-text-primary' : 'text-white'}`}>SmartBudget AI</h3>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isDark ? 'bg-charcoal-success' : 'bg-emerald-400'}`} />
-                                    <span className={`text-[10px] font-bold ${isDark ? 'text-charcoal-success' : 'text-emerald-400'}`}>Online & Learning</span>
+                                    <span className={`text-[10px] font-bold ${isDark ? 'text-charcoal-success' : 'text-emerald-400'}`}>System Connected</span>
                                 </div>
                             </div>
                         </div>
@@ -145,6 +148,34 @@ export default function Chat() {
                         >
                             <X size={20} />
                         </button>
+                    </div>
+
+                    {/* AI Provider Selection Bar */}
+                    <div className={`px-6 py-2 border-b flex items-center justify-between gap-2
+                        ${isDark ? 'bg-charcoal-tertiary/40 border-charcoal-border' : 'bg-slate-50 border-black/5'}`}>
+                        <span className={`text-[10px] font-black uppercase tracking-tighter ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>
+                            Choose Intelligence:
+                        </span>
+                        <div className={`flex p-0.5 rounded-lg ${isDark ? 'bg-charcoal-secondary/50' : 'bg-slate-200'}`}>
+                            <button
+                                onClick={() => dispatch({ type: 'SET_PREFERRED_AI', payload: 'gemini' })}
+                                className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all duration-300
+                                    ${preferredAI === 'gemini' 
+                                        ? (isDark ? 'bg-charcoal-accent text-white shadow-lg' : 'bg-black text-white shadow-md') 
+                                        : (isDark ? 'text-charcoal-text-muted hover:text-charcoal-text-primary' : 'text-slate-600 hover:text-black')}`}
+                            >
+                                Gemini
+                            </button>
+                            <button
+                                onClick={() => dispatch({ type: 'SET_PREFERRED_AI', payload: 'groq' })}
+                                className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all duration-300
+                                    ${preferredAI === 'groq' 
+                                        ? (isDark ? 'bg-charcoal-accent text-white shadow-lg' : 'bg-black text-white shadow-md') 
+                                        : (isDark ? 'text-charcoal-text-muted hover:text-charcoal-text-primary' : 'text-slate-600 hover:text-black')}`}
+                            >
+                                Groq
+                            </button>
+                        </div>
                     </div>
 
                     {/* Messages Container */}
@@ -233,7 +264,7 @@ export default function Chat() {
                                 placeholder="Speak naturally..."
                                 className={`w-full border-2 rounded-2xl py-4 pl-5 pr-14 text-sm transition-all shadow-inner focus:outline-none focus:ring-2
                                     ${isDark 
-                                        ? 'bg-charcoal-secondary border-charcoal-accent/30 text-white placeholder:text-slate-400 focus:ring-charcoal-accent/50' 
+                                        ? 'bg-charcoal-secondary border-charcoal-border text-white placeholder:text-charcoal-text-muted focus:ring-charcoal-accent/50' 
                                         : 'bg-white border-slate-200 text-black placeholder:text-slate-400 focus:ring-black/5'}`}
                                 disabled={isLoading}
                             />
@@ -247,7 +278,7 @@ export default function Chat() {
                             </button>
                         </form>
                         <p className={`text-[10px] text-center mt-4 font-bold uppercase tracking-widest opacity-60 ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>
-                            Powered by Llama-3.3-70b AI
+                            Powered by {preferredAI === 'gemini' ? 'Google Gemini' : 'Llama-3.3-70b (Groq)'}
                         </p>
                     </div>
                 </div>

@@ -20,7 +20,7 @@ export function getGenAI() {
 export function getModel() {
     const genAI = getGenAI();
     return genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
+        model: "gemini-flash-latest",
         generationConfig: {
             responseMimeType: "application/json",
         }
