@@ -74,12 +74,15 @@ export default function Chat() {
                 addNotification('AI strategy updated', 'success');
             }
 
-            // Refresh data if a transaction was added
-            if (data.action === 'transaction_added') {
+            // Refresh data if a transaction was added or budget created
+            if (data.action === 'transaction_added' || data.action === 'budget_created') {
                 // Small delay to let DB commit propagate, then await full refresh
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 await refreshData();
-                addNotification('Transaction added successfully!', 'success');
+                addNotification(
+                    data.action === 'transaction_added' ? 'Transaction added successfully!' : 'Budget created successfully!', 
+                    'success'
+                );
             }
         } catch (error: any) {
             console.error(error);

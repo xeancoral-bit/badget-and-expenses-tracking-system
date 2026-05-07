@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
-import { getUser, getChatHistory } from '@/lib/db';
+import { getUser, getChatHistory, getAccounts, getCategories, createTransaction, createBudget } from '@/lib/db';
 import { processChatMessage } from '@/lib/ai-service';
 
 export async function POST(request: Request) {
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
         const body = await request.json();
-        const result = await processChatMessage(user.id, body.message, body.provider);
+        const result = (await processChatMessage(user.id, body.message, body.provider)) as any;
 
         return NextResponse.json(result);
     } catch (error: any) {

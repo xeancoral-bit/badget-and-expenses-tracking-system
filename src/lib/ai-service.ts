@@ -41,11 +41,18 @@ FINANCIAL CONTEXT:
 
 PROTOCOL:
 - Respond in VALID JSON ONLY.
-- Structure: { "response": "string", "action": string|null, "transaction_data": object|null }
-- To add a transaction, use: "action": "transaction_added", "transaction_data": { "amount": number, "type": "income"|"expense", "category_name": "string", "description": "string" }
-- For finance queries, use the exact numbers above.
+- Structure: { "response": "string", "action": string|null, "data": object|null }
+- ACTIONS:
+  1. "transaction_added": { "amount": number, "type": "income"|"expense", "category_name": "string", "description": "string" }
+  2. "budget_created": { "category_name": "string", "amount": number, "period": "monthly" }
+  3. "analytics_requested": { "focus": "spending"|"trends"|"savings" }
+
+GUIDELINES:
+- For "post" requests (add, set, create), use the appropriate action and data object.
+- For "fetch" requests (how much, analyze, compare), use the context numbers provided above.
 - If the user asks about their spending, refer to the "Top Spending Categories".
-- If the user asks about their budget status, refer to the "Budgets" context.`;
+- If the user asks about their budget status, refer to the "Budgets" context.
+- Keep responses professional, encouraging, and accurate to the data.`;
 
         let aiResult: any = { 
             response: "I'm having trouble connecting to my AI core. Please ensure your GEMINI_API_KEY or GROQ_API_KEY is correctly set in your Vercel project settings.", 
@@ -126,17 +133,17 @@ PROTOCOL:
         
         const response = aiResult.response || "I've processed your request.";
         const action = aiResult.action || null;
-        const transaction_data = aiResult.transaction_data || null;
+        const actionData = aiResult.data || aiResult.transaction_data || null;
 
-        // 4. Handle Actions
-        let finalAction: string | undefined = undefined;
-        let finalData: any = undefined;
+        // 4. Handle Actions (Direct execution for immediate feedback)
+        let finalAction: string | null = action;
+        let finalData: any = actionData;
 
-        if (action === 'transaction_added' && transaction_data && transaction_data.amount) {
+        if (action === 'transaction_added' && actionData && actionData.amount) {
             try {
-                const transType = transaction_data.type || 'expense';
+                const transType = actionData.type || 'expense';
                 const allCats = await getCategories(transType);
-                const categoryName = transaction_data.category_name || (transType === 'income' ? 'Salary' : 'Other');
+                const categoryName = actionData.category_name || (transType === 'income' ? 'Salary' : 'Other');
                 
                 const category = allCats.find((c: any) => 
                     c.name.toLowerCase() === categoryName.toLowerCase() ||
@@ -147,10 +154,10 @@ PROTOCOL:
                 const finalCategoryId = category ? category.id : (allCats.find((c: any) => c.name.toLowerCase().includes('other'))?.id || allCats[0]?.id || (transType === 'income' ? 1 : 10));
 
                 const transactionData: TransactionFormData = {
-                    account_id: transaction_data.account_id || accounts[0]?.id || 1,
-                    amount: Math.abs(transaction_data.amount),
+                    account_id: actionData.account_id || accounts[0]?.id || 1,
+                    amount: Math.abs(actionData.amount),
                     type: transType as 'income' | 'expense',
-                    description: transaction_data.description || `AI Added ${transType}`,
+                    description: actionData.description || `AI Added ${transType}`,
                     category_id: finalCategoryId,
                     date: new Date().toISOString().split('T')[0]
                 };
@@ -159,10 +166,25 @@ PROTOCOL:
                 finalAction = 'transaction_added';
                 finalData = transactionData;
             } catch (actError: any) {
-                console.error("Action handler failed:", actError);
-                return { 
-                    response: `I tried to add that transaction, but encountered a database error: ${actError.message || 'Unknown error'}. Please ensure your Supabase connection is active.` 
-                };
+                console.error("Transaction action failed:", actError);
+            }
+        } else if (action === 'budget_created' && actionData && actionData.amount) {
+            try {
+                const categories = await getCategories();
+                const category = categories.find((c: any) => 
+                    c.name.toLowerCase() === actionData.category_name.toLowerCase()
+                ) || { id: 1 };
+
+                await createBudget(userId, {
+                    category_id: category.id,
+                    amount: Number(actionData.amount),
+                    period: actionData.period || 'monthly',
+                    start_date: new Date().toISOString().split('T')[0]
+                });
+                finalAction = 'budget_created';
+                finalData = actionData;
+            } catch (actError: any) {
+                console.error("Budget action failed:", actError);
             }
         }
 
@@ -172,7 +194,7 @@ PROTOCOL:
 
         return {
             response,
-            action: finalAction,
+            action: finalAction || undefined,
             data: finalData
         };
 
