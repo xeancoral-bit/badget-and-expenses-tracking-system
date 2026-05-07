@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getFinancialSummary, getSpendingByCategory, getMonthlyTrends, getBudgets, getAccounts, getCategories, createTransaction, addChatMessage, getChatHistory } from './db';
+import { getFinancialSummary, getSpendingByCategory, getMonthlyTrends, getBudgets, getAccounts, getCategories, createTransaction, createBudget, addChatMessage, getChatHistory } from './db';
 import type { AIInsight, TransactionFormData } from './types';
 
 // Process chat message and generate AI response
@@ -43,7 +43,7 @@ PROTOCOL:
 - Respond in VALID JSON ONLY.
 - Structure: { "response": "string", "action": string|null, "data": object|null }
 - ACTIONS:
-  1. "transaction_added": { "amount": number, "type": "income"|"expense", "category_name": "string", "description": "string" }
+  1. "transaction_added": { "amount": number, "type": "income"|"expense", "category_name": "string", "description": "string", "date": "YYYY-MM-DD" }
   2. "budget_created": { "category_name": "string", "amount": number, "period": "monthly" }
   3. "analytics_requested": { "focus": "spending"|"trends"|"savings" }
 
@@ -141,38 +141,59 @@ GUIDELINES:
 
         if (action === 'transaction_added' && actionData && actionData.amount) {
             try {
-                const transType = actionData.type || 'expense';
-                const allCats = await getCategories(transType);
-                const categoryName = actionData.category_name || (transType === 'income' ? 'Salary' : 'Other');
+                // 1. Normalize Type
+                let transType = (actionData.type || 'expense').toLowerCase();
+                if (transType.includes('inc')) transType = 'income';
+                if (transType.includes('exp')) transType = 'expense';
                 
+                // 2. Resolve Category
+                const allCats = await getCategories();
+                const categoryName = actionData.category_name || (transType === 'income' ? 'Salary' : 'Other Expenses');
+                
+                // Fuzzy match category
                 const category = allCats.find((c: any) => 
                     c.name.toLowerCase() === categoryName.toLowerCase() ||
                     categoryName.toLowerCase().includes(c.name.toLowerCase()) ||
                     c.name.toLowerCase().includes(categoryName.toLowerCase())
                 );
+                
+                const finalCategoryId = category ? category.id : (allCats.find((c: any) => 
+                    c.name.toLowerCase().includes(transType === 'income' ? 'other income' : 'other expenses')
+                )?.id || allCats[0]?.id || (transType === 'income' ? 94 : 93)); // Fallback to common IDs from migration
 
-                const finalCategoryId = category ? category.id : (allCats.find((c: any) => c.name.toLowerCase().includes('other'))?.id || allCats[0]?.id || (transType === 'income' ? 1 : 10));
-
+                // 3. Prepare Final Data
                 const transactionData: TransactionFormData = {
                     account_id: actionData.account_id || accounts[0]?.id || 1,
-                    amount: Math.abs(actionData.amount),
+                    amount: Math.abs(Number(actionData.amount)),
                     type: transType as 'income' | 'expense',
-                    description: actionData.description || `AI Added ${transType}`,
+                    description: actionData.description || `AI Added: ${categoryName}`,
                     category_id: finalCategoryId,
-                    date: new Date().toISOString().split('T')[0]
+                    date: actionData.date || new Date().toISOString().split('T')[0]
                 };
 
-                await createTransaction(userId, transactionData);
+                console.log('AI Service: Executing transaction action:', transactionData);
+                const transaction = await createTransaction(userId, transactionData);
+                
                 finalAction = 'transaction_added';
-                finalData = transactionData;
+                finalData = transaction;
+                
+                console.log('AI Service: Transaction success:', transaction.id);
             } catch (actError: any) {
-                console.error("Transaction action failed:", actError);
+                console.error("AI Service: Transaction action failed:", actError);
+                const errorMsg = actError.message || "Unknown database error";
+                const responseWithWarning = `⚠️ **Sync Failed**: I tried to add that transaction, but I encountered a database error: ${errorMsg}. Please ensure your Supabase connection is active.`;
+                
+                return {
+                    response: responseWithWarning,
+                    action: undefined,
+                    data: actionData
+                };
             }
         } else if (action === 'budget_created' && actionData && actionData.amount) {
             try {
                 const categories = await getCategories();
                 const category = categories.find((c: any) => 
-                    c.name.toLowerCase() === actionData.category_name.toLowerCase()
+                    c.name.toLowerCase() === (actionData.category_name || '').toLowerCase()
                 ) || { id: 1 };
 
                 await createBudget(userId, {
@@ -185,6 +206,14 @@ GUIDELINES:
                 finalData = actionData;
             } catch (actError: any) {
                 console.error("Budget action failed:", actError);
+                const errorMsg = actError.message || "Unknown database error";
+                const responseWithWarning = `⚠️ **Budget Sync Failed**: I couldn't create the budget in the database. Error: ${errorMsg}`;
+                
+                return {
+                    response: responseWithWarning,
+                    action: undefined,
+                    data: actionData
+                };
             }
         }
 

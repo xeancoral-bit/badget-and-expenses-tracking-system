@@ -21,7 +21,7 @@ const navItems = [
 
 export default function Sidebar() {
     const { state, dispatch } = useApp();
-    const { activeTab, accounts, summary, chatOpen } = state;
+    const { activeTab, accounts, summary, chatOpen, isLoading } = state;
 
     const handleNavClick = (id: string) => {
         dispatch({ type: 'SET_ACTIVE_TAB', payload: id });
@@ -61,6 +61,8 @@ export default function Sidebar() {
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
+    const isDark = state.theme === 'dark';
+
     return (
         <aside className="sidebar">
             <div className="sidebar-logo">
@@ -69,36 +71,77 @@ export default function Sidebar() {
                         <Wallet className="text-white" size={24} />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-text-primary transition-colors">SmartBudget</h1>
-                        <p className="text-xs text-text-secondary font-medium transition-colors">AI-Powered Finance</p>
+                        <h1 className="text-xl font-black text-text-primary tracking-tight">SmartBudget</h1>
+                        <p className="text-[10px] font-bold text-accent uppercase tracking-[0.2em]">AI Strategic</p>
                     </div>
                 </div>
             </div>
 
-            <div className="p-5 mx-4 mb-4 bg-secondary rounded-2xl border border-border shadow-md">
-                <div className="flex items-center justify-between mb-3 text-text-primary/90">
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-black dark:text-black">Total Balance</span>
-                    <TrendingUp className="text-emerald-500 opacity-80" size={16} />
+            {/* Financial Overview - Live Connection to AI State */}
+            <div className="p-5 mx-4 mb-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-border/50 shadow-sm transition-all hover:shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-text-muted">Net Worth</span>
+                    {isLoading ? (
+                        <div className="flex items-center gap-1.5 bg-accent/10 px-2 py-0.5 rounded-full">
+                            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                            <span className="text-[8px] font-black text-accent uppercase tracking-tighter">Syncing...</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">Live</span>
+                        </div>
+                    )}
                 </div>
-                <p className="text-2xl font-bold text-text-primary tracking-tight flex items-baseline gap-1">
-                    <span className="text-text-muted text-lg font-medium">₱</span>
-                    {totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <div className="mt-4 flex items-center gap-3 text-[11px] font-semibold">
-                    <div className="flex items-center gap-1 text-emerald-600">
-                        <span>₱{totalIncome.toLocaleString()}</span>
-                        <span className="opacity-60 font-normal">in</span>
+                    <div className={`mt-8 p-6 rounded-3xl border transition-all duration-500
+                    ${isDark 
+                        ? 'bg-charcoal-tertiary/40 border-charcoal-accent/20 shadow-xl' 
+                        : 'bg-slate-50 border-black/5 shadow-inner'
+                    }`}>
+                    <div className="flex items-center justify-between mb-6">
+                        <h4 className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-charcoal-text-muted' : 'text-slate-400'}`}>Financial Summary</h4>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-accent animate-ping' : 'bg-emerald-500'}`} />
                     </div>
-                    <span className="text-text-muted">|</span>
-                    <div className="flex items-center gap-1 text-red-600">
-                        <span>₱{totalExpenses.toLocaleString()}</span>
-                        <span className="opacity-60 font-normal">out</span>
+                    
+                    <div className="space-y-5">
+                        <div className="flex justify-between items-center group">
+                            <span className={`text-xs font-bold ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>Total Income</span>
+                            <span className="text-sm font-black text-emerald-500 tracking-tighter group-hover:scale-110 transition-transform">
+                                ₱{totalIncome.toLocaleString()}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center group">
+                            <span className={`text-xs font-bold ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>Expenses</span>
+                            <span className="text-sm font-black text-red-500 tracking-tighter group-hover:scale-110 transition-transform">
+                                ₱{totalExpenses.toLocaleString()}
+                            </span>
+                        </div>
+                        <div className={`h-px w-full my-4 ${isDark ? 'bg-charcoal-border' : 'bg-black/5'}`} />
+                        <div className="flex justify-between items-center">
+                            <span className={`text-xs font-black uppercase tracking-widest ${isDark ? 'text-charcoal-text-primary' : 'text-black'}`}>Balance</span>
+                            <span className={`text-lg font-black tracking-tighter ${totalBalance >= 0 ? (isDark ? 'text-charcoal-accent' : 'text-black') : 'text-red-600'}`}>
+                                ₱{totalBalance.toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className={`mt-6 p-3 rounded-2xl flex items-center gap-3
+                        ${isDark ? 'bg-charcoal-accent/10' : 'bg-black/5'}`}>
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-charcoal-accent/20' : 'bg-black/10'}`}>
+                            <TrendingUp size={16} className={isDark ? 'text-charcoal-accent' : 'text-black'} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className={`text-[9px] font-black uppercase tracking-tighter ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>Savings Rate</span>
+                            <span className={`text-xs font-black ${isDark ? 'text-charcoal-text-primary' : 'text-black'}`}>
+                                {totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0}%
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <nav className="sidebar-nav">
-                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3 px-2">Main Menu</p>
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4 px-2">Main Menu</p>
                 <ul className="space-y-1">
                     {navItems.map((item) => {
                         const Icon = item.icon;
@@ -107,13 +150,13 @@ export default function Sidebar() {
                             <li key={item.id}>
                                 <button
                                     onClick={() => handleNavClick(item.id)}
-                                    className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-                                        ? 'bg-accent text-white shadow-lg shadow-accent/20 active'
+                                    className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${isActive
+                                        ? 'bg-accent text-white shadow-lg shadow-accent/20 active font-bold'
                                         : 'text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800'
                                         }`}
                                 >
-                                    <Icon size={18} />
-                                    <span className="text-sm font-medium">{item.label}</span>
+                                    <Icon size={18} className={isActive ? 'text-white' : 'text-text-muted'} />
+                                    <span className="text-sm">{item.label}</span>
                                 </button>
                             </li>
                         );
@@ -121,25 +164,23 @@ export default function Sidebar() {
                 </ul>
             </nav>
 
-
-
-            <div className={`p-4 mx-4 mb-4 border-t border-border`}>
-                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3">Living Accounts</p>
+            <div className="mt-auto p-4 mx-4 mb-4 border-t border-border/30">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4">Accounts</p>
                 <ul className="space-y-3">
-                    {accounts?.slice(0, 4)?.map((account) => {
+                    {accounts?.slice(0, 3)?.map((account) => {
                         const accountSpecificBalance = state.transactions
                             .filter(t => t.account_id === account.id)
                             .reduce((sum, t) => t.type === 'income' ? sum + Number(t.amount) : sum - Number(t.amount), 0);
 
                         return (
-                            <li key={account.id} className="flex items-center justify-between">
+                            <li key={account.id} className="flex items-center justify-between group cursor-pointer">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center ${getAccountIconClass(account.type)}`}>
+                                    <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center transition-transform group-hover:scale-110 ${getAccountIconClass(account.type)}`}>
                                         <Wallet size={14} className="text-text-muted" />
                                     </div>
-                                    <span className="text-xs font-semibold text-text-primary truncate">{account.name}</span>
+                                    <span className="text-[11px] font-bold text-text-primary truncate">{account.name}</span>
                                 </div>
-                                <span className={`text-xs font-bold ${accountSpecificBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                <span className={`text-[11px] font-black ${accountSpecificBalance >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                                     ₱{accountSpecificBalance.toLocaleString()}
                                 </span>
                             </li>

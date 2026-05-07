@@ -23,6 +23,7 @@ interface AppState {
     showAddTransactionModal: boolean;
     showAddBudgetModal: boolean;
     preferredAI: 'gemini' | 'groq';
+    lastSync: Date | null;
 }
 
 type AppAction =
@@ -49,7 +50,8 @@ type AppAction =
     | { type: 'ADD_TRANSACTION_SHORTCUT' }
     | { type: 'ADD_BUDGET_SHORTCUT' }
     | { type: 'CLOSE_MODALS' }
-    | { type: 'SET_PREFERRED_AI'; payload: 'gemini' | 'groq' };
+    | { type: 'SET_PREFERRED_AI'; payload: 'gemini' | 'groq' }
+    | { type: 'SET_LAST_SYNC'; payload: Date };
 
 const initialState: AppState = {
     user: null,
@@ -71,6 +73,7 @@ const initialState: AppState = {
     showAddTransactionModal: false,
     showAddBudgetModal: false,
     preferredAI: 'gemini',
+    lastSync: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -170,6 +173,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
             };
         case 'SET_PREFERRED_AI':
             return { ...state, preferredAI: action.payload };
+        case 'SET_LAST_SYNC':
+            return { ...state, lastSync: action.payload };
         default:
             return state;
     }
@@ -203,12 +208,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 fetch('/api/chat').then(r => r.json()).catch(() => [])
             ]);
 
+            // Diagnostic: Check if SERVICE_ROLE_KEY is misconfigured (often matches ANON_KEY by mistake)
+            if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === process.env.SUPABASE_SERVICE_ROLE_KEY) {
+                console.warn('⚠️ SECURITY WARNING: SUPABASE_SERVICE_ROLE_KEY matches NEXT_PUBLIC_SUPABASE_ANON_KEY. This will cause RLS issues.');
+                // We don't show this to user in UI unless it actually fails
+            }
+
             if (userRes && !userRes.error) dispatch({ type: 'SET_USER', payload: userRes });
-            if (Array.isArray(accountsRes)) dispatch({ type: 'SET_ACCOUNTS', payload: accountsRes });
-            if (Array.isArray(transactionsRes)) dispatch({ type: 'SET_TRANSACTIONS', payload: transactionsRes });
-            if (Array.isArray(budgetsRes)) dispatch({ type: 'SET_BUDGETS', payload: budgetsRes });
+            
+            if (Array.isArray(accountsRes)) {
+                dispatch({ type: 'SET_ACCOUNTS', payload: accountsRes });
+            } else if (accountsRes?.error) {
+                console.error('Accounts Sync Error:', accountsRes.error);
+                dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Database Locked: ${accountsRes.error}. Please check your Supabase RLS settings.`, type: 'error' } });
+            }
+
+            if (Array.isArray(transactionsRes)) {
+                dispatch({ type: 'SET_TRANSACTIONS', payload: transactionsRes });
+            } else if (transactionsRes?.error) {
+                console.error('Transactions Sync Error:', transactionsRes.error);
+                dispatch({ type: 'ADD_NOTIFICATION', payload: { message: `Sync Error: ${transactionsRes.error}`, type: 'error' } });
+            }
+
+            if (Array.isArray(budgetsRes)) {
+                dispatch({ type: 'SET_BUDGETS', payload: budgetsRes });
+            }
+
             if (Array.isArray(categoriesRes)) {
-                // Force unique categories by name and type to prevent "balikbalik" in UI
                 const uniqueCategories = categoriesRes.filter((c, index, self) => 
                     index === self.findIndex((t) => (
                         t.name === c.name && t.type === c.type
@@ -216,11 +242,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 );
                 dispatch({ type: 'SET_CATEGORIES', payload: uniqueCategories });
             }
-            if (summaryRes && !summaryRes.error) dispatch({ type: 'SET_SUMMARY', payload: summaryRes });
+
+            if (summaryRes && !summaryRes.error) {
+                dispatch({ type: 'SET_SUMMARY', payload: summaryRes });
+            } else if (summaryRes?.error) {
+                console.error('Summary Sync Error:', summaryRes.error);
+            }
+
             if (Array.isArray(spendingRes)) dispatch({ type: 'SET_SPENDING', payload: spendingRes });
             if (Array.isArray(trendsRes)) dispatch({ type: 'SET_TRENDS', payload: trendsRes });
             if (Array.isArray(insightsRes)) dispatch({ type: 'SET_INSIGHTS', payload: insightsRes });
             if (Array.isArray(chatRes)) dispatch({ type: 'SET_CHAT_MESSAGES', payload: chatRes });
+            
+            dispatch({ type: 'SET_LAST_SYNC', payload: new Date() });
         } catch (error) {
             console.error('Failed to refresh data:', error);
         } finally {

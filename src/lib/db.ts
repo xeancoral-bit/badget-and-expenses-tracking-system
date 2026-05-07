@@ -16,6 +16,12 @@ export async function getUser() {
 
         if (error) {
             console.error('Supabase Query Error:', error.message);
+            
+            // Critical RLS / Permission Check
+            if (error.message.includes('row-level security') || error.message.includes('permission denied')) {
+                console.error('🚨 ACTION REQUIRED: Row-Level Security (RLS) is blocking database access. Run "ALTER TABLE users DISABLE ROW LEVEL SECURITY;" in your Supabase SQL Editor.');
+            }
+
             // If it's a network error/fetch failure, throw to be caught by the outer catch
             if (error.message.includes('fetch') || error.message.includes('network')) {
                 throw new Error(error.message);
@@ -24,22 +30,23 @@ export async function getUser() {
         }
 
         if (users && users.length > 0) {
+            const user = users[0];
             // Ensure they have an account
             const { data: accounts } = await admin
                 .from('accounts')
                 .select('id')
-                .eq('user_id', users[0].id)
+                .eq('user_id', user.id)
                 .limit(1);
 
             if (!accounts || accounts.length === 0) {
                 await admin.from('accounts').insert({
-                    user_id: users[0].id,
+                    user_id: user.id,
                     name: 'Main Account',
                     type: 'checking',
                     balance: 0,
                 });
             }
-            return users[0];
+            return user;
         }
 
         // Create default demo user if table is empty but reachable
@@ -49,16 +56,32 @@ export async function getUser() {
             .select()
             .single();
 
-        if (insertError) throw new Error(`createUser error: ${insertError.message}`);
+        if (insertError) {
+            console.error('createUser error:', insertError.message);
+            
+            // If duplicate email, just fetch that user
+            if (insertError.message.includes('unique constraint') || insertError.message.includes('already exists')) {
+                const { data: existingUser } = await admin
+                    .from('users')
+                    .select('*')
+                    .eq('email', 'user@example.com')
+                    .single();
+                if (existingUser) return existingUser;
+            }
+            throw new Error(`createUser error: ${insertError.message}`);
+        }
 
-        await admin.from('accounts').insert({
-            user_id: newUser.id,
-            name: 'Main Account',
-            type: 'checking',
-            balance: 0,
-        });
-
-        return newUser;
+        if (newUser) {
+            await admin.from('accounts').insert({
+                user_id: newUser.id,
+                name: 'Main Account',
+                type: 'checking',
+                balance: 0,
+            });
+            return newUser;
+        }
+        
+        throw new Error('Failed to retrieve or create user');
 
     } catch (err: any) {
         console.error('⚠️ DATABASE CONNECTIVITY CRITICAL:', err.message);
@@ -86,7 +109,7 @@ export async function getAccounts(userId: number) {
             .from('accounts')
             .select('*')
             .eq('user_id', userId)
-            .order('created_at', { ascending: true });
+            .order('id', { ascending: true });
 
         if (error) throw error;
         return data || [];
@@ -226,7 +249,7 @@ export async function getTransactions(
             `)
             .eq('user_id', userId)
             .order('date', { ascending: false })
-            .order('created_at', { ascending: false });
+            .order('id', { ascending: false });
 
         if (filters?.accountId)  query = query.eq('account_id', filters.accountId);
         if (filters?.categoryId) query = query.eq('category_id', filters.categoryId);
@@ -235,7 +258,13 @@ export async function getTransactions(
         if (filters?.type)       query = query.eq('type', filters.type);
 
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error('getTransactions Error:', error.message);
+            if (error.message.includes('row-level security') || error.message.includes('policy')) {
+                return { error: `RLS policy blocked access. Run "ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;" in Supabase SQL Editor.` } as any;
+            }
+            throw error;
+        }
 
         // Flatten joined fields to match what the UI expects
         return (data || []).map((t: any) => ({
@@ -266,7 +295,12 @@ export async function createTransaction(
         .select()
         .single();
 
-    if (error) throw new Error(`createTransaction error: ${error.message}`);
+    if (error) {
+        if (error.message.includes('row-level security') || error.message.includes('policy')) {
+            throw new Error(`DATABASE_RLS_LOCKED: Row-Level Security is blocking this transaction. Please run "ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;" in your Supabase SQL Editor to enable AI auto-sync.`);
+        }
+        throw new Error(`createTransaction error: ${error.message}`);
+    }
 
     // Update account balance
     const account = await getAccountById(data.account_id);
@@ -632,7 +666,7 @@ export async function getChatHistory(userId: number, limit: number = 50) {
             .from('chat_messages')
             .select('*')
             .eq('user_id', userId)
-            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
             .limit(limit);
 
         if (error) throw error;

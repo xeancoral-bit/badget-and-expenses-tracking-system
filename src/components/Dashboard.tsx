@@ -101,17 +101,24 @@ export default function Dashboard() {
     const recentTransactions = transactions.slice(0, 5);
 
     return (
-        <div className="space-y-6 animate-fadeIn pb-10">
-            <div className="flex items-center justify-between">
+        <div className="space-y-8 animate-fadeIn pb-12">
+            {/* Header Area with Status */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-black text-text-primary tracking-tight">Financial Overview</h2>
-                    <p className="text-text-muted text-sm font-medium">Tracking your wealth in real-time.</p>
+                    <h1 className="text-4xl font-black tracking-tight text-text-primary mb-1">Financial Pulse</h1>
+                    <p className="text-text-muted font-medium">Real-time health monitoring of your wealth.</p>
                 </div>
-                <div className="hidden md:flex items-center gap-3">
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">All Time Net</span>
-                        <span className={`text-sm font-black ${(stats.allTimeIncome - stats.allTimeExpenses) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {(stats.allTimeIncome - stats.allTimeExpenses) >= 0 ? '+' : ''}₱{(stats.allTimeIncome - stats.allTimeExpenses).toLocaleString()}
+                
+                <div className={`flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all duration-500
+                    ${state.isLoading 
+                        ? 'bg-accent/5 border-accent/20 scale-105' 
+                        : 'bg-emerald-500/5 border-emerald-500/10'
+                    }`}>
+                    <div className={`w-2 h-2 rounded-full ${state.isLoading ? 'bg-accent animate-ping' : 'bg-emerald-500'}`} />
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-text-muted leading-none">AI Sync Status</span>
+                        <span className="text-xs font-bold text-text-primary">
+                            {state.isLoading ? 'Processing Transaction...' : (state.lastSync ? `Connected • ${format(state.lastSync, 'HH:mm:ss')}` : 'Connecting...')}
                         </span>
                     </div>
                 </div>
@@ -127,10 +134,18 @@ export default function Dashboard() {
                             <Wallet className="text-accent" size={20} />
                         </div>
                     </div>
-                    <p className="text-2xl font-bold text-text-primary tracking-tighter">₱{stats.balance.toLocaleString()}</p>
+                    <p 
+                        id="d_totalbalance"
+                        key={`bal-${stats.balance}`}
+                        className="text-2xl font-black text-text-primary tracking-tighter"
+                    >
+                        ₱{stats.balance.toLocaleString()}
+                    </p>
                     <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[10px] text-emerald-600 font-bold px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 rounded">SAFE</span>
-                        <span className="text-xs text-text-muted">Available now</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${stats.balance >= 0 ? 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30' : 'text-red-600 bg-red-100 dark:bg-red-900/30'}`}>
+                            {stats.balance >= 0 ? 'SOLVENT' : 'DEFICIT'}
+                        </span>
+                        <span className="text-xs text-text-muted font-medium">Net Liquidity</span>
                     </div>
                 </div>
 
