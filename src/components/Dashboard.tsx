@@ -62,6 +62,16 @@ export default function Dashboard() {
     }, [transactions]);
 
     const stats = React.useMemo(() => {
+        const now = new Date();
+        const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+        const clientMonthlyIncome = transactions
+            .filter(t => t.type === 'income' && t.date >= startOfMonth)
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+        const clientMonthlyExpenses = transactions
+            .filter(t => t.type === 'expense' && t.date >= startOfMonth)
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
         const clientAllTimeIncome = transactions
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -71,20 +81,31 @@ export default function Dashboard() {
 
         const serverAllTimeIncome = summary?.allTimeIncome || 0;
         const serverAllTimeExpenses = summary?.allTimeExpenses || 0;
+        const serverMonthlyIncome = summary?.totalIncome || 0;
+        const serverMonthlyExpenses = summary?.totalExpenses || 0;
 
-        const allTimeIncome = Math.max(serverAllTimeIncome, clientAllTimeIncome);
-        const allTimeExpenses = Math.max(serverAllTimeExpenses, clientAllTimeExpenses);
+        const totalIncome = clientMonthlyIncome;
+        const totalExpenses = clientMonthlyExpenses;
+        const allTimeIncome = clientAllTimeIncome;
+        const allTimeExpenses = clientAllTimeExpenses;
 
         const balance = allTimeIncome - allTimeExpenses;
         const savingsRate = allTimeIncome > 0 
             ? ((allTimeIncome - allTimeExpenses) / allTimeIncome) * 100 
+            : 0;
+        
+        const monthlySavingsRate = totalIncome > 0
+            ? ((totalIncome - totalExpenses) / totalIncome) * 100
             : 0;
 
         return {
             balance,
             allTimeIncome,
             allTimeExpenses,
+            totalIncome,
+            totalExpenses,
             savingsRate,
+            monthlySavingsRate
         };
     }, [summary, transactions]);
 
@@ -158,14 +179,14 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <p 
-                        id="d_alltimeincome"
+                        id="d_totalincome"
                         key={`inc-${stats.allTimeIncome}`}
                         className="text-2xl font-bold text-emerald-600 tracking-tighter animate-fadeIn"
                     >
                         ₱{stats.allTimeIncome.toLocaleString()}
                     </p>
                     <p className="text-[10px] uppercase font-bold text-text-muted mt-2 tracking-wider">
-                        Overall Earnings
+                        Total Lifetime Earnings
                     </p>
                 </div>
 
@@ -178,14 +199,14 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <p 
-                        id="d_alltimeexpenses"
+                        id="d_totalexpenses"
                         key={`exp-${stats.allTimeExpenses}`}
                         className="text-2xl font-bold text-red-600 tracking-tighter animate-fadeIn"
                     >
                         ₱{stats.allTimeExpenses.toLocaleString()}
                     </p>
                     <p className="text-[10px] uppercase font-bold text-text-muted mt-2 tracking-wider">
-                        Overall Spending
+                        Total Lifetime Spending
                     </p>
                 </div>
 
@@ -216,7 +237,7 @@ export default function Dashboard() {
                             {savingsRateInfo.label}
                         </span>
                         <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                            ₱{(stats.allTimeIncome - stats.allTimeExpenses).toLocaleString()} saved
+                            ₱{(stats.allTimeIncome - stats.allTimeExpenses).toLocaleString()} saved total
                         </span>
                     </div>
                 </div>

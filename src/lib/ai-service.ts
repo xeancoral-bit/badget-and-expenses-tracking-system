@@ -168,7 +168,7 @@ GUIDELINES:
                     type: transType as 'income' | 'expense',
                     description: actionData.description || `AI Added: ${categoryName}`,
                     category_id: finalCategoryId,
-                    date: actionData.date || new Date().toISOString().split('T')[0]
+                    date: actionData.date || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
                 };
 
                 console.log('AI Service: Executing transaction action:', transactionData);

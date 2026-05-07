@@ -204,19 +204,22 @@ export function categorizeTransaction(description: string, type: 'income' | 'exp
     const expenseKeywords: Record<string, string[]> = {
         'Food & Dining': ['food', 'meal', 'restaurant', 'lunch', 'dinner', 'breakfast', 'coffee', 'cafe', 'pizza', 'grocery', 'starbucks', 'mcdonalds', 'kfc', 'grabfood', 'foodpanda', 'jollibee', 'mcdo', 'bakery'],
         'Transportation': ['uber', 'lyft', 'gas', 'fuel', 'parking', 'taxi', 'car', 'transport', 'train', 'bus', 'metro', 'grab', 'angkas', 'joyride', 'petrol', 'diesel'],
-        'Shopping': ['shop', 'store', 'mall', 'amazon', 'walmart', 'target', 'clothing', 'shoes', 'apple', 'nike', 'zara', 'shopee', 'lazada', 'tiktok shop'],
-        'Bills & Utilities': ['bill', 'rent', 'electric', 'water', 'internet', 'phone', 'utility', 'insurance', 'tax', 'mortgage', 'meralco', 'pldt', 'globe', 'smart'],
-        'Entertainment': ['movie', 'netflix', 'spotify', 'game', 'concert', 'entertainment', 'cinema', 'hulu', 'disney', 'steam', 'playstation', 'xbox'],
-        'Health & Medical': ['doctor', 'pharmacy', 'hospital', 'medicine', 'health', 'medical', 'dentist', 'clinic', 'watsons', 'mercury drug'],
+        'Strategic Shopping': ['shop', 'store', 'mall', 'amazon', 'walmart', 'target', 'clothing', 'shoes', 'apple', 'nike', 'zara', 'shopee', 'lazada', 'tiktok shop'],
+        'Utilities & Bills': ['bill', 'rent', 'electric', 'water', 'internet', 'phone', 'utility', 'insurance', 'tax', 'mortgage', 'meralco', 'pldt', 'globe', 'smart', 'netflix', 'spotify', 'subscription'],
+        'Entertainment': ['movie', 'game', 'concert', 'entertainment', 'cinema', 'hulu', 'disney', 'steam', 'playstation', 'xbox'],
+        'Health & Wellness': ['doctor', 'pharmacy', 'hospital', 'medicine', 'health', 'medical', 'dentist', 'clinic', 'watsons', 'mercury drug', 'gym', 'workout'],
         'Education': ['book', 'course', 'school', 'education', 'learning', 'university', 'tuition', 'udemy', 'coursera'],
-        'Groceries': ['grocery', 'supermarket', 'market', 'tesco', 'aldi', 'lidl', 'safeway', 'kroger', 'puregold', 'sm market', 'robinsons'],
+        'Housing & Rent': ['rent', 'mortgage', 'apartment', 'condo', 'housing', 'realty'],
+        'Insurance': ['insurance', 'axa', 'pru', 'sunlife'],
+        'Investments': ['investment', 'stock', 'crypto', 'binance', 'coinbase', 'etoro'],
     };
 
     const incomeKeywords: Record<string, string[]> = {
-        'Salary': ['salary', 'paycheck', 'paid', 'payroll'],
-        'Freelance': ['freelance', 'work', 'contract', 'gig', 'upwork', 'fiverr'],
-        'Investments': ['investment', 'dividend', 'interest', 'return', 'stock', 'crypto'],
-        'Business': ['business', 'revenue', 'profit', 'sales'],
+        'Primary Salary': ['salary', 'paycheck', 'paid', 'payroll'],
+        'Freelance Revenue': ['freelance', 'work', 'contract', 'gig', 'upwork', 'fiverr'],
+        'Investment Returns': ['investment', 'dividend', 'interest', 'return', 'stock', 'crypto'],
+        'Rental Income': ['rent', 'landlord', 'tenant'],
+        'Gifts & Awards': ['gift', 'award', 'bonus', 'prize'],
     };
 
     const keywords = type === 'income' ? incomeKeywords : expenseKeywords;
@@ -227,7 +230,7 @@ export function categorizeTransaction(description: string, type: 'income' | 'exp
         }
     }
 
-    return type === 'income' ? 'Other Income' : 'Other Expenses';
+    return type === 'income' ? 'Other Inflow' : 'Miscellaneous';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -412,7 +415,7 @@ export async function getBudgets(userId: number) {
 
         // Get current month's expense transactions
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
         const { data: transactions } = await admin
             .from('transactions')
@@ -601,8 +604,8 @@ export async function getFinancialSummary(userId: number) {
         
         // Month specific aggregates
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const endOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`; // Simple approach, SQL gte/lte handles it
 
         const { data: monthlyTrans } = await admin
             .from('transactions')
@@ -674,6 +677,29 @@ export async function getChatHistory(userId: number, limit: number = 50) {
     } catch (err: any) {
         console.error('getChatHistory fallback:', err.message);
         return [];
+    }
+}
+
+export async function resetUserData(userId: number) {
+    try {
+        const admin = getSupabaseAdmin();
+        
+        // Delete all transactions
+        await admin.from('transactions').delete().eq('user_id', userId);
+        
+        // Delete all budgets
+        await admin.from('budgets').delete().eq('user_id', userId);
+        
+        // Delete all chat history
+        await admin.from('chat_messages').delete().eq('user_id', userId);
+        
+        // Reset account balances to 0 (optional but good for a full reset)
+        await admin.from('accounts').update({ balance: 0 }).eq('user_id', userId);
+        
+        return { success: true };
+    } catch (err: any) {
+        console.error('resetUserData error:', err.message);
+        throw err;
     }
 }
 

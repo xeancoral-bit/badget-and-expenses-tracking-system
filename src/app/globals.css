@@ -752,6 +752,22 @@ tr:hover td {
     z-index: 50;
     overflow-y: auto;
     overflow-x: hidden;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.closed {
+    transform: translateX(-280px);
+}
+
+/* Mobile behavior */
+@media (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-280px);
+        box-shadow: 20px 0 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .sidebar.open {
+        transform: translateX(0);
+    }
 }
 
 .sidebar-logo {
@@ -794,6 +810,35 @@ tr:hover td {
     margin-left: 280px;
     padding: 32px;
     min-height: 100vh;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content.sidebar-closed {
+    margin-left: 0;
+}
+
+@media (max-width: 1024px) {
+    .main-content {
+        margin-left: 0;
+        padding: 24px 16px;
+    }
+}
+
+/* Sidebar Overlay for mobile */
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 45;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.sidebar-overlay.show {
+    opacity: 1;
+    visibility: visible;
 }
 
 /* Page header */

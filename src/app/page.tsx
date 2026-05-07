@@ -13,7 +13,8 @@ import { Loader2 } from 'lucide-react';
 
 export default function Home() {
     const { state } = useApp();
-    const { activeTab, isLoading } = state;
+    const { activeTab, isLoading, sidebarOpen } = state;
+    const { dispatch } = useApp();
 
     if (isLoading) {
         return (
@@ -42,11 +43,20 @@ export default function Home() {
     };
 
     return (
-        <div className="min-h-screen bg-primary">
+        <div className="min-h-screen bg-primary transition-colors duration-300">
+            {/* Sidebar Overlay for mobile */}
+            <div 
+                className={`sidebar-overlay ${sidebarOpen ? 'show' : ''}`}
+                onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+            />
+
             <Sidebar />
             <Header />
-            <main className="ml-[280px] mt-16 p-8">
-                {renderContent()}
+            
+            <main className={`transition-all duration-300 pt-16 min-h-screen ${sidebarOpen ? 'lg:pl-[280px]' : 'pl-0'}`}>
+                <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+                    {renderContent()}
+                </div>
             </main>
             <Chat />
         </div>

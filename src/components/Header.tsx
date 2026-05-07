@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, User, Camera, X, Check, Info, AlertCircle, Sun, Moon } from 'lucide-react';
+import { Bell, User, Camera, X, Check, Info, AlertCircle, Sun, Moon, Menu } from 'lucide-react';
 import { useApp } from '@/lib/AppContext';
 
 export default function Header() {
     const { state, dispatch } = useApp();
-    const { notifications, user, theme } = state;
+    const { notifications, user, theme, sidebarOpen } = state;
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -85,14 +85,23 @@ export default function Header() {
     const pageTitle = tabLabel.charAt(0).toUpperCase() + tabLabel.slice(1);
 
     return (
-        <header className={`fixed top-0 left-[280px] right-0 h-16 z-40 px-8 flex items-center justify-between shadow-sm transition-colors duration-300
+        <header className={`fixed top-0 right-0 h-16 z-40 px-4 md:px-8 flex items-center justify-between shadow-sm transition-all duration-300
+            ${sidebarOpen ? 'lg:left-[280px]' : 'left-0'}
             ${isDark
                 ? 'bg-slate-900/80 backdrop-blur-xl border-b border-white/5'
                 : 'bg-white/80 backdrop-blur-xl border-b border-slate-200'
             }`}
         >
-            {/* Page Title */}
-            <div className="flex items-center gap-3">
+            {/* Left side: Hamburger + Page Title */}
+            <div className="flex items-center gap-4">
+                <button
+                    onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+                    className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+                    aria-label="Toggle Sidebar"
+                >
+                    <Menu size={24} />
+                </button>
+                
                 <h2 className={`text-xl font-semibold transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     {pageTitle}
                 </h2>

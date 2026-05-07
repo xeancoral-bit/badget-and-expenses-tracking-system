@@ -8,7 +8,8 @@ import {
     Target,
     MessageSquare,
     Wallet,
-    TrendingUp
+    TrendingUp,
+    X
 } from 'lucide-react';
 import { useApp } from '@/lib/AppContext';
 
@@ -21,10 +22,14 @@ const navItems = [
 
 export default function Sidebar() {
     const { state, dispatch } = useApp();
-    const { activeTab, accounts, summary, chatOpen, isLoading } = state;
+    const { activeTab, accounts, summary, chatOpen, isLoading, sidebarOpen } = state;
 
     const handleNavClick = (id: string) => {
         dispatch({ type: 'SET_ACTIVE_TAB', payload: id });
+        // Close sidebar on mobile after navigation
+        if (window.innerWidth < 1024) {
+            dispatch({ type: 'TOGGLE_SIDEBAR' });
+        }
     };
 
     const toggleChat = () => {
@@ -45,36 +50,40 @@ export default function Sidebar() {
 
     // Calculate current month's totals from the transaction list (Single Source of Truth)
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
-    const currentMonthTransactions = state.transactions.filter(t => {
-        const [year, month, day] = t.date.split('-');
-        const tDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        return tDate >= startOfMonth;
-    });
+    const currentMonthTransactions = state.transactions.filter(t => t.date >= startOfMonth);
 
-    const totalIncome = currentMonthTransactions
+    const totalIncome = state.transactions
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    const totalExpenses = currentMonthTransactions
+    const totalExpenses = state.transactions
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     const isDark = state.theme === 'dark';
 
     return (
-        <aside className="sidebar">
-            <div className="sidebar-logo">
+        <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+            <div className="sidebar-logo flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center shadow-lg shadow-accent/30">
-                        <Wallet className="text-white" size={24} />
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-accent flex items-center justify-center shadow-lg shadow-accent/30">
+                        <Wallet className="text-white" size={20} />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-text-primary tracking-tight">SmartBudget</h1>
-                        <p className="text-[10px] font-bold text-accent uppercase tracking-[0.2em]">AI Strategic</p>
+                        <h1 className="text-lg md:text-xl font-black text-text-primary tracking-tight">SmartBudget</h1>
+                        <p className="text-[9px] md:text-[10px] font-bold text-accent uppercase tracking-[0.2em]">AI Strategic</p>
                     </div>
                 </div>
+                
+                {/* Close button for mobile */}
+                <button 
+                    onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+                    className="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-text-muted"
+                >
+                    <X size={20} />
+                </button>
             </div>
 
             {/* Financial Overview - Live Connection to AI State */}
@@ -105,7 +114,7 @@ export default function Sidebar() {
                     
                     <div className="space-y-5">
                         <div className="flex justify-between items-center group">
-                            <span className={`text-xs font-bold ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>Total Income</span>
+                            <span className={`text-xs font-bold ${isDark ? 'text-charcoal-text-muted' : 'text-slate-500'}`}>Income</span>
                             <span className="text-sm font-black text-emerald-500 tracking-tighter group-hover:scale-110 transition-transform">
                                 ₱{totalIncome.toLocaleString()}
                             </span>
