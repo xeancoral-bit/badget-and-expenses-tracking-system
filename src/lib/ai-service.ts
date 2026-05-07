@@ -30,18 +30,22 @@ export async function processChatMessage(userId: number, message: string, prefer
 You are directly connected to the user's Dashboard, Transactions, Budgets, and Analytics modules.
 
 FINANCIAL CONTEXT:
-- Monthly Income: ₱${summary.totalIncome.toLocaleString()}
-- Monthly Expenses: ₱${summary.totalExpenses.toLocaleString()}
-- Total Balance: ₱${summary.totalBalance.toLocaleString()}
+- Monthly Summary: Income ₱${summary.totalIncome.toLocaleString()}, Expenses ₱${summary.totalExpenses.toLocaleString()}, Balance ₱${summary.totalBalance.toLocaleString()}
+- All-time Totals: Income ₱${summary.allTimeIncome.toLocaleString()}, Expenses ₱${summary.allTimeExpenses.toLocaleString()}
 - Savings Rate: ${summary.savingsRate.toFixed(1)}%
-- Categories: ${categories.map((c: any) => c.name).join(', ')}
 - Accounts: ${accounts.map((a: any) => `${a.name} (₱${a.balance})`).join(', ')}
+- Budgets: ${budgets.length > 0 ? budgets.map((b: any) => `${b.category_name}: ₱${b.spent}/${b.amount}`).join(', ') : 'No budgets set'}
+- Top Spending Categories: ${spending.length > 0 ? spending.slice(0, 5).map((s: any) => `${s.category} (₱${s.amount})`).join(', ') : 'No spending recorded'}
+- Recent Trends (Last 6 Months): ${trends.map((t: any) => `${t.month}: ₱${t.income} in, ₱${t.expenses} out`).join(', ')}
+- Available Categories: ${categories.map((c: any) => c.name).join(', ')}
 
 PROTOCOL:
 - Respond in VALID JSON ONLY.
 - Structure: { "response": "string", "action": string|null, "transaction_data": object|null }
-- To add a transaction, use: "action": "transaction_added"
-- For finance queries, use the exact numbers above.`;
+- To add a transaction, use: "action": "transaction_added", "transaction_data": { "amount": number, "type": "income"|"expense", "category_name": "string", "description": "string" }
+- For finance queries, use the exact numbers above.
+- If the user asks about their spending, refer to the "Top Spending Categories".
+- If the user asks about their budget status, refer to the "Budgets" context.`;
 
         let aiResult: any = { 
             response: "I'm having trouble connecting to my AI core. Please ensure your GEMINI_API_KEY or GROQ_API_KEY is correctly set in your Vercel project settings.", 

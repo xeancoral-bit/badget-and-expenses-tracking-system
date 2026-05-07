@@ -1,3 +1,16 @@
+-- Ensure categories table has all required columns
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='color') THEN
+        ALTER TABLE categories ADD COLUMN color TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='icon') THEN
+        ALTER TABLE categories ADD COLUMN icon TEXT;
+    END IF;
+    -- Drop conflicting policies if they exist
+    DROP POLICY IF EXISTS "Enable all for all" ON categories;
+END $$;
+
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -58,7 +71,15 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed Initial Categories (Optional, but good for default state)
+-- Disable RLS for simplified development as per specification
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE budgets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
+
+-- Seed Initial Categories
 INSERT INTO categories (name, type, icon, color) VALUES 
 ('Food & Dining', 'expense', 'utensils', '#F59E0B'),
 ('Transportation', 'expense', 'car', '#3B82F6'),
@@ -76,4 +97,4 @@ INSERT INTO categories (name, type, icon, color) VALUES
 ('Business', 'income', 'building', '#EC4899'),
 ('Gifts', 'income', 'gift', '#F59E0B'),
 ('Other Income', 'income', 'plus-circle', '#6B7280')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
